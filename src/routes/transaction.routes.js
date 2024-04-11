@@ -1,6 +1,13 @@
-import router from "express";
-import trasactionController from "../controllers/transaction.controller";
+import { Router } from "express";
+import { verifyToken } from "../middleware/auth.js";
+import transationCtrl from "../controllers/transactionController.js";
 
-router.post("/create", trasactionController.createTransaction);
+const route = new Router();
 
-module.exports = router;
+// Routes
+route.post("/transaction", verifyToken, transationCtrl.performTransaction);
+route.get("/transactions", verifyToken, transationCtrl.getAllTransactions);
+route.get("/transactions/:userId", verifyToken, transationCtrl.getUserTransactions);
+route.get("/transaction/:transactionId", verifyToken, transationCtrl.deleteTransaction);
+
+export default route;

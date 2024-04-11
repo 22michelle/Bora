@@ -1,35 +1,30 @@
-import mongoose from "mongoose";
+import mongoose, { SchemaType } from "mongoose";
+import mongoosePaginate from "mongoose-paginate-v2";
 
 const { Schema, model } = mongoose;
 
 const TransactionSchema = new Schema(
   {
-    userId: {
-      type: Schema.Types.ObjectId,
+    senderAccountNumber: {
+      type: Number,
       ref: "User",
       required: true,
     },
-    type: {
-      type: String,
-      enum: ["deposit", "withdrawal", "transfer"],
+    receiverAccountNumber: {
+      type: Number,
+      ref: "User",
       required: true,
     },
     amount: {
       type: Number,
       required: true,
     },
-    description: {
-      type: String,
-      trim: true,
-    },
-    date: {
-      type: Date,
-      default: Date.now,
-    },
   },
   {
     timestamps: true,
   }
 );
+
+TransactionSchema.plugin(mongoosePaginate);
 
 export const TransactionModel = model("Transaction", TransactionSchema);

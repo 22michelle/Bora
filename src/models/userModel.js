@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
-import shortid from "shortid";
+import jwt from "jsonwebtoken";
 import mongoosePaginate from "mongoose-paginate-v2";
 
 const { Schema, model } = mongoose;
@@ -15,27 +15,28 @@ const UserShema = new Schema(
   {
     name: {
       type: String,
-      required: [true, "El campo es obligatorio"],
+      required: [true, "The field is required"],
+      unique: true,
     },
     email: {
       type: String,
-      required: [true, "El campo es obligatorio"],
+      required: [true, "The field is required"],
       unique: true,
       lowercase: true,
       trim: true,
       match: [
         /^[\w-]+@([\w-]+\.)+[\w-]{2,4}$/,
-        "Por favor, introduce un email válido",
+        "Please, enter a valid email",
       ],
     },
     password: {
       type: String,
-      required: [true, "El campo es obligatoria"],
-      minlength: [6, "La contraseña debe tener al menos 6 caracteres"],
+      required: [true, "The field is required"],
+      minlength: [6, "The password must be at least 6 characters"],
     },
     balance: {
       type: Number,
-      default: 0,
+      default: 1000,
     },
     accountNumber: {
       type: String,

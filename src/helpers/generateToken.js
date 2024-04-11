@@ -5,6 +5,7 @@ export const generateToken = (payload) => {
     const token = jwt.sign(payload, process.env.KEYWORD_TOKEN, {
       expiresIn: "30d",
     });
+    return token;
   } catch (error) {
     console.log("Error al generar token", error.message);
   }
