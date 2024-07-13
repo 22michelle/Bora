@@ -11,28 +11,27 @@ const generateAccountNumber = () => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 };
 
-const UserShema = new Schema(
+const UserSchema = new Schema(
   {
     name: {
       type: String,
-      required: [true, "The field is required"],
-      unique: true,
+      required: [true, "Name is required"],
     },
     email: {
       type: String,
-      required: [true, "The field is required"],
+      required: [true, "Email is required"],
       unique: true,
       lowercase: true,
       trim: true,
       match: [
         /^[\w-]+@([\w-]+\.)+[\w-]{2,4}$/,
-        "Please, enter a valid email",
+        "Please enter a valid email address",
       ],
     },
     password: {
       type: String,
-      required: [true, "The field is required"],
-      minlength: [6, "The password must be at least 6 characters"],
+      required: [true, "Password is required"],
+      minlength: [6, "Password must be at least 6 characters long"],
     },
     balance: {
       type: Number,
@@ -44,7 +43,7 @@ const UserShema = new Schema(
       required: true,
       default: generateAccountNumber,
     },
-    transactionHistroy: [
+    transactionHistory: [
       {
         type: Schema.Types.ObjectId,
         ref: "Transaction",
@@ -56,16 +55,30 @@ const UserShema = new Schema(
   }
 );
 
-UserShema.method.matchPassword = async function (password) {
-  return await bcrypt.compare(password, this.password);
+UserSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) {
+    return next();
+  }
+
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+UserSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
 };
 
-UserShema.methods.generateAuthToken = function () {
-  return jwt.sign({ id: this._id }, process.env.JWT_SECRET, {
+UserSchema.methods.generateAuthToken = function () {
+  return jwt.sign({ id: this._id }, process.env.KEYWORD_TOKEN, {
     expiresIn: "300d",
   });
 };
 
-UserShema.plugin(mongoosePaginate);
+UserSchema.plugin(mongoosePaginate);
 
-export const UserModel = model("User", UserShema);
+export const UserModel = model("User", UserSchema);

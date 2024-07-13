@@ -4,109 +4,88 @@ import { TransactionModel } from "../models/transactionModel.js";
 
 const transactionCtrl = {};
 
+// Helper function to calculate fee
+const calculateFee = (amount, feePercentage) => {
+  return amount * (feePercentage / 100); // Calculate fee based on percentage
+};
+
+// Function to handle the distribution logic
+const distributeAmount = async (from, to, amount, feePercentage) => {
+  try {
+    let remainingAmount = amount;
+
+    while (remainingAmount > 0) {
+      const sender = await UserModel.findById(from);
+      const receiver = await UserModel.findOne({ accountNumber: to });
+
+      if (!sender || !receiver) {
+        console.log(`User with account ${from} or ${to} not found`);
+        break;
+      }
+
+      // Calculate the amount to be sent in this iteration
+      const fee = calculateFee(remainingAmount, feePercentage);
+      const transactionAmount = Math.min(sender.balance - fee, remainingAmount);
+
+      // Create a new transaction record
+      const newTransaction = new TransactionModel({
+        senderId: sender._id,
+        receiverId: receiver._id,
+        amount: transactionAmount,
+        feeRate: feePercentage,
+        isDistributed: true,
+      });
+      await newTransaction.save();
+
+      // Update sender's balance
+      await UserModel.findByIdAndUpdate(sender._id, {
+        $inc: { balance: -1 * (transactionAmount + fee) },
+        $push: { transactionHistory: newTransaction._id },
+      });
+
+      // Update receiver's balance
+      await UserModel.findByIdAndUpdate(receiver._id, {
+        $inc: { balance: transactionAmount },
+      });
+
+      remainingAmount -= transactionAmount;
+    }
+  } catch (error) {
+    throw new Error(`Error distributing amount: ${error.message}`);
+  }
+};
+
+// Controller method to perform transaction
 transactionCtrl.performTransaction = async (req, res) => {
   try {
-    const { senderAccountNumber, receiverAccountNumber, amount } = req.body;
-
-    console.log("Sender Account Number:", senderAccountNumber);
-    // console.log("Receiver Account Number:", receiverAccountNumber);
-    // console.log("Amount: ", amount)
+    const { senderAccountNumber, receiverAccountNumber, amount, feePercentage } = req.body;
 
     const sender = await UserModel.findOne({ accountNumber: senderAccountNumber });
     const receiver = await UserModel.findOne({ accountNumber: receiverAccountNumber });
 
-    // console.log("Sender:", sender);
-    // console.log("Receiver:", receiver);
-
     if (!sender || !receiver) {
-      return response(res, 404, false, "", "User not found");
+      return response(res, 404, false, null, "Sender or receiver not found");
     }
+
     if (sender.balance < amount) {
-      return response(res, 400, false, "", "Insufficient balance");
+      return response(res, 400, false, null, "Insufficient balance");
     }
 
-    // Create Transaction
-    const transaction = new TransactionModel({
-      senderAccountNumber: sender.accountNumber,
-      receiverAccountNumber: receiver.accountNumber,
-      amount: amount,
-    });
+    // Perform the transaction and update balances
+    await distributeAmount(sender._id, receiver.accountNumber, amount, feePercentage);
 
-    await transaction.save();
-
-    // Update the user's balance
-    sender.balance -= amount;
-    receiver.balance += amount;
-
-    await sender.save();
-    await receiver.save();
-
-    response(res, 200, true, "Transaction successful");
+    response(res, 200, true, null, "Transaction successful");
   } catch (error) {
+    console.error(`Error performing transaction: ${error.message}`);
     response(res, 500, false, null, error.message);
   }
 };
 
+// Controller method to get all transactions
 transactionCtrl.getAllTransactions = async (req, res) => {
   try {
     const transactions = await TransactionModel.find();
-    response(
-      res,
-      200,
-      true,
-      transactions,
-      "Transaction obtained successfully"
-    );
-  } catch (error) {
-    response(res, 500, false, null, error.message);
-  }
-};
-
-transactionCtrl.getUserTransactions = async (req, res) => {
-  try {
-    const { accountNumber } = req.params;
-    const transactions = await TransactionModel.find({
-      $or: [{ senderAccountNumber: accountNumber }, { receiverAccountNumber: accountNumber }],
-    });
-    response(
-      res,
-      200,
-      true,
-      transactions,
-      "Transactions obtained successfully"
-    );
-  } catch (error) {
-    response(res, 500, false, null, error.message);
-  }
-};
-
-transactionCtrl.deleteTransaction = async (req, res) => {
-  try {
-    const { transactionId } = req.params;
-    const transaction = await TransactionModel.findById(transactionId);
-
-    if (!transaction) {
-      return response(res, 404, false, "", "Transaction not found");
-    }
-
-    const sender = await UserModel.findOne({ accountNumber: transaction.senderAccountNumber });
-    const receiver = await UserModel.findOne({ accountNumber: transaction.receiverAccountNumber });
-
-    // Restore the balance of deleted users to their initial state
-    sender.balance += transaction.amount;
-    receiver.balance -= transaction.amount;
-
-    await sender.save();
-    await receiver.save();
-
-    await TransactionModel.findByIdAndDelete(transactionId);
-    response(
-      res,
-      200,
-      true,
-      null,
-      "Transaction deleted successfully"
-    );
+    response(res, 200, true, transactions, "Transactions obtained successfully");
   } catch (error) {
     response(res, 500, false, null, error.message);
   }

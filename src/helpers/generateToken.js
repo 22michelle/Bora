@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 
+// Generate Token
 export const generateToken = (payload) => {
   try {
     const token = jwt.sign(payload, process.env.KEYWORD_TOKEN, {
@@ -7,6 +8,6 @@ export const generateToken = (payload) => {
     });
     return token;
   } catch (error) {
-    console.log("Error al generar token", error.message);
+    console.log("Error generating token", error.message);
   }
 };

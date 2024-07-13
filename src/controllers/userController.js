@@ -3,63 +3,64 @@ import { UserModel } from "../models/userModel.js";
 import bcrypt from "bcrypt";
 import { generateToken } from "../helpers/generateToken.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const userCtrl = {};
+
+// User Profile
+userCtrl.getUserProfile = async (req, res) => {
+  try {
+    const user = await UserModel.findById(req.userId).select("-password");
+    if (!user) {
+      return res.status(404).json({ ok: false, data: null, message: "User not found" });
+    }
+    res.status(200).json({ ok: true, data: user, message: "User profile retrieved successfully" });
+  } catch (error) {
+    console.error("Error retrieving user profile:", error);
+    res.status(500).json({ ok: false, data: null, message: "Server error" });
+  }
+};
 
 // Create User
 userCtrl.register = async (req, res) => {
   try {
-    const { email, password, name } = req.body;
-    const userExists = await UserModel.findOne({ $or: [{ email }, { name }] });
+    const { name, email, password, confirmPassword } = req.body;
 
-    if (userExists) {
-      if (userExists.email === email) {
-        return response(
-          res,
-          409,
-          false,
-          "",
-          "Email already exists in another record"
-        );
-      } else {
-        return response(res, 409, false, "", "Name already taken");
-      }
+    if (password !== confirmPassword) {
+      return response(res, 400, false, null, "Passwords do not match");
     }
 
-    const salt = bcrypt.genSaltSync(10);
-    const passwordHash = bcrypt.hashSync(password, salt);
-
-    const newUser = new UserModel({ email, password: passwordHash, name });
+    const newUser = new UserModel({ name, email, password });
     await newUser.save();
 
-    const token = generateToken({ user: newUser._id });
-
+    const token = newUser.generateAuthToken(); // Generate token with userId
     response(
       res,
       201,
       true,
-      { ...newUser._doc, password: null, token },
-      "User created successfully"
+      { ...newUser.toJSON(), token },
+      "Registration successful"
     );
   } catch (error) {
     response(res, 500, false, null, error.message);
   }
 };
 
-// Login User
+//  Login
 userCtrl.login = async (req, res) => {
   try {
     const { password, email } = req.body;
     const user = await UserModel.findOne({ email });
 
     if (user && bcrypt.compareSync(password, user.password)) {
-      const token = generateToken({ user: user._id });
+      // Generate token with user ID
+      const token = user.generateAuthToken();
       return response(
         res,
         200,
         true,
         { ...user.toJSON(), password: null, token },
-        "Welcome"
+        "Welcome to Bora"
       );
     }
 
@@ -160,8 +161,13 @@ userCtrl.getUserByToken = async (req, res) => {
 // Get User by Id
 userCtrl.getUserById = async (req, res) => {
   try {
-    const user = await UserModel.findById(req.params.userId);
+    const userId = req.params.userId;
 
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return response(res, 400, false, null, "Invalid User ID");
+    }
+
+    const user = await UserModel.findById(userId);
     if (!user) {
       return response(res, 404, false, "", "User not found");
     }

@@ -10,7 +10,7 @@ import { connectDB } from "./database.js";
 // Routes
 import userRoutes from "./src/routes/user.routes.js"
 import transactionRoutes from "./src/routes/transaction.routes.js"
-// import userRoutes from "./src/routes/distribution.routes.js"
+
 
 connectDB();
 
@@ -25,7 +25,6 @@ app.use(express.json());
 // Rutas
 app.use("/user", userRoutes);
 app.use("/transaction", transactionRoutes);
-// app.use("/distribution", userRoutes);
 
 app.listen(app.get("Port"), () => {
   console.log("Servidor escuchando por el puerto", app.get("Port"));

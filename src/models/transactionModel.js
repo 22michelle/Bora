@@ -5,19 +5,28 @@ const { Schema, model } = mongoose;
 
 const TransactionSchema = new Schema(
   {
-    senderAccountNumber: {
-      type: Number,
+    senderId: {
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-    receiverAccountNumber: {
-      type: Number,
+    receiverId: {
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
     amount: {
       type: Number,
       required: true,
+    },
+    feeRate: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    isDistributed: {
+      type: Boolean,
+      default: false,
     },
   },
   {

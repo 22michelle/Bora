@@ -2,18 +2,19 @@ import { Router } from "express";
 import { verifyToken } from "../middleware/auth.js";
 import userCtrl from "../controllers/userController.js";
 
-const route = new Router();
+const router = Router();
 
 // Public routes
-route.post("/register", verifyToken, userCtrl.register);
-route.post("/login", verifyToken, userCtrl.login);
-route.get("/token/:token", verifyToken, userCtrl.getUserByToken);
+router.post("/register", userCtrl.register);
+router.post("/login", userCtrl.login);
+router.get("/token/:token", userCtrl.getUserByToken);
 
-// Private routes 
-route.get("/:userId", verifyToken, userCtrl.getUserById);
-route.get("/email/:email", verifyToken, userCtrl.getUserByEmail);
-route.delete("/:email", verifyToken, userCtrl.deleteUser);
-route.put("/:email", verifyToken, userCtrl.updateUser);
-route.get("/", verifyToken, userCtrl.getAllUsers);
+// Private routes
+router.get("/:userId", verifyToken, userCtrl.getUserById);
+router.get("/email/:email", verifyToken, userCtrl.getUserByEmail);
+router.delete("/:email", verifyToken, userCtrl.deleteUser);
+router.put("/:email", verifyToken, userCtrl.updateUser);
+router.get("/", verifyToken, userCtrl.getAllUsers);
+router.get("/profile", verifyToken, userCtrl.getUserProfile);
 
-export default route;
+export default router;
