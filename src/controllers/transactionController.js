@@ -10,24 +10,38 @@ transactionCtrl.calculateFee = (amount, feePercentage) => {
 };
 
 // Function to handle the distribution logic
-transactionCtrl.distributeAmount = async (from, toAccountNumber, amount, feePercentage) => {
+transactionCtrl.distributeAmount = async (
+  from,
+  toAccountNumber,
+  amount,
+  feePercentage
+) => {
   try {
     let remainingAmount = amount;
 
     while (remainingAmount > 0) {
       const sender = await UserModel.findById(from);
-      const receiver = await UserModel.findOne({ accountNumber: toAccountNumber });
+      const receiver = await UserModel.findOne({
+        accountNumber: toAccountNumber,
+      });
 
       if (!sender || !receiver) {
-        throw new Error(`User with account ${from} or ${toAccountNumber} not found`);
+        throw new Error(
+          `User with account ${from} or ${toAccountNumber} not found`
+        );
       }
+
+      // Store sender's initial and final balance for this iteration
+      const initialSenderBalance = sender.balance;
 
       // Calculate the amount to be sent in this iteration
       const fee = transactionCtrl.calculateFee(remainingAmount, feePercentage);
       const transactionAmount = Math.min(sender.balance - fee, remainingAmount);
 
       if (transactionAmount <= 0) {
-        throw new Error('Insufficient funds for the transaction after fee deduction');
+        throw new Error(
+          "Insufficient funds for the transaction after fee deduction"
+        );
       }
 
       // Create a new transaction record
@@ -37,6 +51,8 @@ transactionCtrl.distributeAmount = async (from, toAccountNumber, amount, feePerc
         amount: transactionAmount,
         feeRate: feePercentage,
         isDistributed: true,
+        initialSenderBalance: initialSenderBalance, // Store initial balance
+        finalSenderBalance: sender.balance - (transactionAmount + fee), // Store final balance
       });
       await newTransaction.save();
 
@@ -59,50 +75,37 @@ transactionCtrl.distributeAmount = async (from, toAccountNumber, amount, feePerc
   }
 };
 
-// Controller method to perform transaction
-transactionCtrl.performTransaction = async (req, res) => {
-  try {
-    const { senderAccountNumber, receiverAccountNumber, amount, feePercentage } = req.body;
-
-    const sender = await UserModel.findOne({ accountNumber: senderAccountNumber });
-    const receiver = await UserModel.findOne({ accountNumber: receiverAccountNumber });
-
-    if (!sender || !receiver) {
-      return response(res, 404, false, null, "Sender or receiver not found");
-    }
-
-    if (sender.balance < amount) {
-      return response(res, 400, false, null, "Insufficient balance");
-    }
-
-    // Perform the transaction and update balances
-    await transactionCtrl.distributeAmount(sender._id, receiverAccountNumber, amount, feePercentage);
-
-    response(res, 200, true, null, "Transaction successful");
-  } catch (error) {
-    console.error(`Error performing transaction: ${error.message}`);
-    response(res, 500, false, null, error.message);
-  }
-};
-
-// Helper function to calculate additional user data
+// Function to calculate additional user data
 const calculateUserData = async (userId) => {
   const user = await UserModel.findById(userId);
-  const outgoingTransactions = await TransactionModel.find({ senderId: userId });
-  const incomingTransactions = await TransactionModel.find({ receiverId: userId });
+  const outgoingTransactions = await TransactionModel.find({
+    senderId: userId,
+  });
+  const incomingTransactions = await TransactionModel.find({
+    receiverId: userId,
+  });
 
-  const sumOutgoing = outgoingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-  const sumIncoming = incomingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-  const totalFees = outgoingTransactions.reduce((sum, tx) => sum + transactionCtrl.calculateFee(tx.amount, tx.feeRate), 0);
+  const sumOutgoing = outgoingTransactions.reduce(
+    (sum, tx) => sum + tx.amount,
+    0
+  );
+  const sumIncoming = incomingTransactions.reduce(
+    (sum, tx) => sum + tx.amount,
+    0
+  );
+  const totalFees = outgoingTransactions.reduce(
+    (sum, tx) => sum + transactionCtrl.calculateFee(tx.amount, tx.feeRate),
+    0
+  );
 
-  const outgoingLinks = outgoingTransactions.map(tx => ({
+  const outgoingLinks = outgoingTransactions.map((tx) => ({
     amount: tx.amount,
-    feeRate: tx.feeRate
+    feeRate: tx.feeRate,
   }));
 
-  const incomingLinks = incomingTransactions.map(tx => ({
+  const incomingLinks = incomingTransactions.map((tx) => ({
     amount: tx.amount,
-    feeRate: tx.feeRate
+    feeRate: tx.feeRate,
   }));
 
   const metabalance = user.balance + totalFees + sumOutgoing - sumIncoming;
@@ -116,14 +119,16 @@ const calculateUserData = async (userId) => {
     totalFees,
     totalIncomingLinks: incomingLinks.length,
     totalOutgoingLinks: outgoingLinks.length,
-    metabalance
+    metabalance,
   };
 };
 
 // Controller method to get all transactions and additional user data
 transactionCtrl.getAllTransactions = async (req, res) => {
   try {
-    const transactions = await TransactionModel.find().populate('senderId receiverId', 'name accountNumber');
+    const transactions = await TransactionModel.find()
+      .sort({ createdAt: 1 })
+      .populate("senderId receiverId", "name accountNumber");
 
     const userDataPromises = transactions.map(async (transaction) => {
       const senderData = await calculateUserData(transaction.senderId._id);
@@ -134,11 +139,13 @@ transactionCtrl.getAllTransactions = async (req, res) => {
         sender: {
           name: transaction.senderId.name,
           balance: senderData.balance,
+          initialBalance: transaction.initialSenderBalance,
+          finalBalance: transaction.finalSenderBalance,
           sumOutgoing: senderData.sumOutgoing,
           sumIncoming: senderData.sumIncoming,
           outgoingLinks: senderData.outgoingLinks,
           totalOutgoingLinks: senderData.totalOutgoingLinks,
-          metabalance: senderData.metabalance
+          metabalance: senderData.metabalance,
         },
         receiver: {
           name: transaction.receiverId.name,
@@ -148,8 +155,8 @@ transactionCtrl.getAllTransactions = async (req, res) => {
           incomingLinks: receiverData.incomingLinks,
           totalIncomingLinks: receiverData.totalIncomingLinks,
           totalFees: receiverData.totalFees,
-          metabalance: receiverData.metabalance
-        }
+          metabalance: receiverData.metabalance,
+        },
       };
     });
 
@@ -157,6 +164,46 @@ transactionCtrl.getAllTransactions = async (req, res) => {
 
     response(res, 200, true, userData, "Transactions obtained successfully");
   } catch (error) {
+    response(res, 500, false, null, error.message);
+  }
+};
+
+// Controller method to perform transaction
+transactionCtrl.performTransaction = async (req, res) => {
+  try {
+    const {
+      senderAccountNumber,
+      receiverAccountNumber,
+      amount,
+      feePercentage,
+    } = req.body;
+
+    const sender = await UserModel.findOne({
+      accountNumber: senderAccountNumber,
+    });
+    const receiver = await UserModel.findOne({
+      accountNumber: receiverAccountNumber,
+    });
+
+    if (!sender || !receiver) {
+      return response(res, 404, false, null, "Sender or receiver not found");
+    }
+
+    if (sender.balance < amount) {
+      return response(res, 400, false, null, "Insufficient balance");
+    }
+
+    // Perform the transaction and update balances
+    await transactionCtrl.distributeAmount(
+      sender._id,
+      receiverAccountNumber,
+      amount,
+      feePercentage
+    );
+
+    response(res, 200, true, null, "Transaction successful");
+  } catch (error) {
+    console.error(`Error performing transaction: ${error.message}`);
     response(res, 500, false, null, error.message);
   }
 };

@@ -27,6 +27,14 @@ const TransactionSchema = new Schema(
       type: Boolean,
       required: true,
     },
+    initialSenderBalance: {
+      type: Number,
+      required: true,
+    },
+    finalSenderBalance: {
+      type: Number,
+      required: true,
+    },
   },
   { timestamps: true }
 );
