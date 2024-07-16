@@ -5,12 +5,12 @@ import { TransactionModel } from "../models/transactionModel.js";
 const transactionCtrl = {};
 
 // Helper function to calculate fee
-const calculateFee = (amount, feePercentage) => {
-  return amount * (feePercentage / 100); // Calculate fee based on percentage
+transactionCtrl.calculateFee = (amount, feePercentage) => {
+  return amount * (feePercentage / 100);
 };
 
 // Function to handle the distribution logic
-const distributeAmount = async (from, to, amount, feePercentage) => {
+transactionCtrl.distributeAmount = async (from, to, amount, feePercentage) => {
   try {
     let remainingAmount = amount;
 
@@ -19,13 +19,16 @@ const distributeAmount = async (from, to, amount, feePercentage) => {
       const receiver = await UserModel.findOne({ accountNumber: to });
 
       if (!sender || !receiver) {
-        console.log(`User with account ${from} or ${to} not found`);
-        break;
+        throw new Error(`User with account ${from} or ${to} not found`);
       }
 
       // Calculate the amount to be sent in this iteration
-      const fee = calculateFee(remainingAmount, feePercentage);
+      const fee = transactionCtrl.calculateFee(remainingAmount, feePercentage);
       const transactionAmount = Math.min(sender.balance - fee, remainingAmount);
+
+      if (transactionAmount <= 0) {
+        throw new Error('Insufficient funds for the transaction after fee deduction');
+      }
 
       // Create a new transaction record
       const newTransaction = new TransactionModel({
@@ -37,15 +40,16 @@ const distributeAmount = async (from, to, amount, feePercentage) => {
       });
       await newTransaction.save();
 
-      // Update sender's balance
+      // Update sender's balance and transaction history
       await UserModel.findByIdAndUpdate(sender._id, {
         $inc: { balance: -1 * (transactionAmount + fee) },
         $push: { transactionHistory: newTransaction._id },
       });
 
-      // Update receiver's balance
+      // Update receiver's balance and transaction history
       await UserModel.findByIdAndUpdate(receiver._id, {
         $inc: { balance: transactionAmount },
+        $push: { transactionHistory: newTransaction._id },
       });
 
       remainingAmount -= transactionAmount;
@@ -72,7 +76,7 @@ transactionCtrl.performTransaction = async (req, res) => {
     }
 
     // Perform the transaction and update balances
-    await distributeAmount(sender._id, receiver.accountNumber, amount, feePercentage);
+    await transactionCtrl.distributeAmount(sender._id, receiver.accountNumber, amount, feePercentage);
 
     response(res, 200, true, null, "Transaction successful");
   } catch (error) {
@@ -84,7 +88,7 @@ transactionCtrl.performTransaction = async (req, res) => {
 // Controller method to get all transactions
 transactionCtrl.getAllTransactions = async (req, res) => {
   try {
-    const transactions = await TransactionModel.find();
+    const transactions = await TransactionModel.find().populate('senderId receiverId', 'name accountNumber');
     response(res, 200, true, transactions, "Transactions obtained successfully");
   } catch (error) {
     response(res, 500, false, null, error.message);

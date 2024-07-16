@@ -5,24 +5,25 @@ const { Schema, model } = mongoose;
 
 const LinkSchema = new Schema(
   {
-    sender_id: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
+    title: {
+      type: String,
       required: true,
     },
-    receiver_id: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
+    description: {
+      type: String,
       required: true,
     },
-    amount: {
-      type: Number,
+    url: {
+      type: String,
+      required: true,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: true,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 LinkSchema.plugin(mongoosePaginate);

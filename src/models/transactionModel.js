@@ -6,12 +6,12 @@ const { Schema, model } = mongoose;
 const TransactionSchema = new Schema(
   {
     senderId: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
     receiverId: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
@@ -22,16 +22,13 @@ const TransactionSchema = new Schema(
     feeRate: {
       type: Number,
       required: true,
-      default: 0,
     },
     isDistributed: {
       type: Boolean,
-      default: false,
+      required: true,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 TransactionSchema.plugin(mongoosePaginate);

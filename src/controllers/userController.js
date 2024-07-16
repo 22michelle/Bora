@@ -46,7 +46,7 @@ userCtrl.register = async (req, res) => {
   }
 };
 
-//  Login
+// Login
 userCtrl.login = async (req, res) => {
   try {
     const { password, email } = req.body;
