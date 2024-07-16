@@ -10,16 +10,16 @@ transactionCtrl.calculateFee = (amount, feePercentage) => {
 };
 
 // Function to handle the distribution logic
-transactionCtrl.distributeAmount = async (from, to, amount, feePercentage) => {
+transactionCtrl.distributeAmount = async (from, toAccountNumber, amount, feePercentage) => {
   try {
     let remainingAmount = amount;
 
     while (remainingAmount > 0) {
       const sender = await UserModel.findById(from);
-      const receiver = await UserModel.findOne({ accountNumber: to });
+      const receiver = await UserModel.findOne({ accountNumber: toAccountNumber });
 
       if (!sender || !receiver) {
-        throw new Error(`User with account ${from} or ${to} not found`);
+        throw new Error(`User with account ${from} or ${toAccountNumber} not found`);
       }
 
       // Calculate the amount to be sent in this iteration
@@ -76,7 +76,7 @@ transactionCtrl.performTransaction = async (req, res) => {
     }
 
     // Perform the transaction and update balances
-    await transactionCtrl.distributeAmount(sender._id, receiver.accountNumber, amount, feePercentage);
+    await transactionCtrl.distributeAmount(sender._id, receiverAccountNumber, amount, feePercentage);
 
     response(res, 200, true, null, "Transaction successful");
   } catch (error) {
@@ -85,11 +85,77 @@ transactionCtrl.performTransaction = async (req, res) => {
   }
 };
 
-// Controller method to get all transactions
+// Helper function to calculate additional user data
+const calculateUserData = async (userId) => {
+  const user = await UserModel.findById(userId);
+  const outgoingTransactions = await TransactionModel.find({ senderId: userId });
+  const incomingTransactions = await TransactionModel.find({ receiverId: userId });
+
+  const sumOutgoing = outgoingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+  const sumIncoming = incomingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+  const totalFees = outgoingTransactions.reduce((sum, tx) => sum + transactionCtrl.calculateFee(tx.amount, tx.feeRate), 0);
+
+  const outgoingLinks = outgoingTransactions.map(tx => ({
+    amount: tx.amount,
+    feeRate: tx.feeRate
+  }));
+
+  const incomingLinks = incomingTransactions.map(tx => ({
+    amount: tx.amount,
+    feeRate: tx.feeRate
+  }));
+
+  const metabalance = user.balance + totalFees + sumOutgoing - sumIncoming;
+
+  return {
+    balance: user.balance,
+    sumOutgoing,
+    sumIncoming,
+    outgoingLinks,
+    incomingLinks,
+    totalFees,
+    totalIncomingLinks: incomingLinks.length,
+    totalOutgoingLinks: outgoingLinks.length,
+    metabalance
+  };
+};
+
+// Controller method to get all transactions and additional user data
 transactionCtrl.getAllTransactions = async (req, res) => {
   try {
     const transactions = await TransactionModel.find().populate('senderId receiverId', 'name accountNumber');
-    response(res, 200, true, transactions, "Transactions obtained successfully");
+
+    const userDataPromises = transactions.map(async (transaction) => {
+      const senderData = await calculateUserData(transaction.senderId._id);
+      const receiverData = await calculateUserData(transaction.receiverId._id);
+
+      return {
+        transaction,
+        sender: {
+          name: transaction.senderId.name,
+          balance: senderData.balance,
+          sumOutgoing: senderData.sumOutgoing,
+          sumIncoming: senderData.sumIncoming,
+          outgoingLinks: senderData.outgoingLinks,
+          totalOutgoingLinks: senderData.totalOutgoingLinks,
+          metabalance: senderData.metabalance
+        },
+        receiver: {
+          name: transaction.receiverId.name,
+          balance: receiverData.balance,
+          sumOutgoing: receiverData.sumOutgoing,
+          sumIncoming: receiverData.sumIncoming,
+          incomingLinks: receiverData.incomingLinks,
+          totalIncomingLinks: receiverData.totalIncomingLinks,
+          totalFees: receiverData.totalFees,
+          metabalance: receiverData.metabalance
+        }
+      };
+    });
+
+    const userData = await Promise.all(userDataPromises);
+
+    response(res, 200, true, userData, "Transactions obtained successfully");
   } catch (error) {
     response(res, 500, false, null, error.message);
   }
