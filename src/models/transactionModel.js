@@ -1,4 +1,4 @@
-import mongoose, { SchemaType } from "mongoose";
+import mongoose from "mongoose";
 import mongoosePaginate from "mongoose-paginate-v2";
 
 const { Schema, model } = mongoose;
@@ -15,16 +15,16 @@ const TransactionSchema = new Schema(
       ref: "User",
       required: true,
     },
+    link: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Link",
+    },
     amount: {
       type: Number,
       required: true,
     },
-    feeRate: {
+    fee_rate: {
       type: Number,
-      required: true,
-    },
-    isDistributed: {
-      type: Boolean,
       required: true,
     },
     initialSenderBalance: {

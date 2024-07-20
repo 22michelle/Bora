@@ -15,6 +15,5 @@ router.get("/email/:email", verifyToken, userCtrl.getUserByEmail);
 router.delete("/:email", verifyToken, userCtrl.deleteUser);
 router.put("/:email", verifyToken, userCtrl.updateUser);
 router.get("/", verifyToken, userCtrl.getAllUsers);
-router.get("/profile", verifyToken, userCtrl.getUserProfile);
 
 export default router;

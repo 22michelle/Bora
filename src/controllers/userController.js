@@ -1,25 +1,12 @@
 import { response } from "../helpers/Response.js";
 import { UserModel } from "../models/userModel.js";
+import { TransactionModel } from "../models/transactionModel.js";
 import bcrypt from "bcrypt";
 import { generateToken } from "../helpers/generateToken.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 
 const userCtrl = {};
-
-// User Profile
-userCtrl.getUserProfile = async (req, res) => {
-  try {
-    const user = await UserModel.findById(req.userId).select("-password");
-    if (!user) {
-      return res.status(404).json({ ok: false, data: null, message: "User not found" });
-    }
-    res.status(200).json({ ok: true, data: user, message: "User profile retrieved successfully" });
-  } catch (error) {
-    console.error("Error retrieving user profile:", error);
-    res.status(500).json({ ok: false, data: null, message: "Server error" });
-  }
-};
 
 // Create User
 userCtrl.register = async (req, res) => {

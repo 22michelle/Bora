@@ -5,21 +5,22 @@ const { Schema, model } = mongoose;
 
 const LinkSchema = new Schema(
   {
-    title: {
-      type: String,
-      required: true,
-    },
-    description: {
-      type: String,
-      required: true,
-    },
-    url: {
-      type: String,
-      required: true,
-    },
-    userId: {
+    senderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      required: true,
+    },
+    receiverId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    fee_rate: {
+      type: Number,
+      required: true,
+    },
+    amount: {
+      type: Number,
       required: true,
     },
   },

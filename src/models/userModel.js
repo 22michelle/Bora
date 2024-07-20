@@ -38,6 +38,41 @@ const UserSchema = new Schema(
       required: true,
       default: 1000,
     },
+    link_obligation: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    link_income: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    value: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    public_rate: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    auxiliary: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    trigger: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    trxCount: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
     accountNumber: {
       type: String,
       unique: true,
