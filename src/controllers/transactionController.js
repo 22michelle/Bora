@@ -1,12 +1,11 @@
 import { response } from "../helpers/Response.js";
 import { UserModel } from "../models/userModel.js";
 import { TransactionModel } from "../models/transactionModel.js";
-import { LinkModel } from "../models/linkModel.js";
 import linkCtrl from "./linkController.js";
 
 const transactionCtrl = {};
 
-// Get all transactions
+// Get All Transactions
 transactionCtrl.getAllTransactions = async (req, res) => {
   try {
     const transactions = await TransactionModel.find()
@@ -69,7 +68,7 @@ transactionCtrl.getAllTransactions = async (req, res) => {
   }
 };
 
-// Create Transaction
+// Create transaction
 transactionCtrl.createTransaction = async (req, res) => {
   try {
     const {
@@ -83,12 +82,8 @@ transactionCtrl.createTransaction = async (req, res) => {
       return response(res, 400, false, "", "All fields are required");
     }
 
-    const sender = await UserModel.findOne({
-      accountNumber: senderAccountNumber,
-    });
-    const receiver = await UserModel.findOne({
-      accountNumber: receiverAccountNumber,
-    });
+    const sender = await UserModel.findOne({ accountNumber: senderAccountNumber });
+    const receiver = await UserModel.findOne({ accountNumber: receiverAccountNumber });
 
     if (!sender || !receiver) {
       return response(res, 404, false, "", "Sender or receiver not found");
@@ -113,6 +108,9 @@ transactionCtrl.createTransaction = async (req, res) => {
 
     sender.balance -= amount + fee;
     sender.public_rate = await transactionCtrl.calculateNewPR(sender);
+    const senderData = await transactionCtrl.calculateUserData(sender._id);
+    sender.link_obligation = senderData.sumOutgoing;
+    sender.link_income = senderData.sumIncoming;
     sender.value =
       sender.balance +
       sender.auxiliary -
@@ -122,8 +120,9 @@ transactionCtrl.createTransaction = async (req, res) => {
     await sender.save();
 
     receiver.balance += amount;
-    receiver.auxiliary += fee;
-    receiver.trxCount += 1;
+    const receiverData = await transactionCtrl.calculateUserData(receiver._id);
+    receiver.link_obligation = receiverData.sumOutgoing;
+    receiver.link_income = receiverData.sumIncoming;
     receiver.value =
       receiver.balance +
       receiver.auxiliary -
@@ -140,16 +139,22 @@ transactionCtrl.createTransaction = async (req, res) => {
     await receiver.save();
 
     // Crear o actualizar el enlace después de crear la transacción
-    await linkCtrl.updateLink({
+    const linkUpdateResponse = await linkCtrl.updateLink({
       body: {
         senderId: sender._id,
         receiverId: receiver._id,
         feeRate: feeRate,
         amount: amount,
       },
-    }, res);
+    });
 
-    response(res, 200, true, null, "Transaction successfully");
+    // Solo aumenta el trigger si se ha creado un nuevo enlace
+    if (linkUpdateResponse.success && linkUpdateResponse.message === "Link created successfully") {
+      receiver.trigger += 1;
+      await receiver.save();
+    }
+
+    return response(res, 200, true, transaction, "Transaction created successfully");
   } catch (error) {
     console.error(`Error performing transaction: ${error.message}`);
     return response(res, 500, false, null, error.message);
@@ -269,7 +274,6 @@ transactionCtrl.calculateUserData = async (userId) => {
   }
 };
 
-// Calculate fee
 transactionCtrl.calculateFee = (amount, feeRate) => {
   return amount * (feeRate / 100);
 };
