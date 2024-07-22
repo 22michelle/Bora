@@ -112,7 +112,7 @@ transactionCtrl.createTransaction = async (req, res) => {
     });
 
     sender.balance -= amount + fee;
-    sender.public_rate = await transactionCtrl.calculateNewPR(sender);
+    sender.public_rate = await transactionCtrl.calculatePR(sender);
     const senderData = await transactionCtrl.calculateUserData(sender._id);
     sender.link_obligation = senderData.sumOutgoing;
     sender.link_income = senderData.sumIncoming;
@@ -176,32 +176,38 @@ transactionCtrl.createTransaction = async (req, res) => {
 };
 
 // Define calculateNewPR function
-transactionCtrl.calculateNewPR = async (user) => {
+transactionCtrl.calculatePR = async (user) => {
   try {
-    // Fetch outgoing links for the user
-    const link_obligation = await LinkModel.find({ senderId: user._id });
+    // Calculate the totalAmount by adding the amounts of the outbound links
+    const totalAmount = await LinkModel.aggregate([
+      { $match: { senderId: user._id } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
 
-    // Calculate sums for the formula
-    const sumProd = link_obligation.reduce(
-      (sum, link) => sum + (link.amount || 0) * (link.feeRate || 0),
-      0
-    );
+    // Calculate the sumProd by adding the product of
+    // the quantities and the rates of the outbound links
+    const sumProd = await LinkModel.aggregate([
+      { $match: { senderId: user._id } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: { $multiply: ["$amount", "$feeRate"] } },
+        },
+      },
+    ]);
 
-    const totalAmount = link_obligation.reduce(
-      (sum, link) => sum + (link.amount || 0),
-      0
-    );
+    const totalAmountValue = totalAmount.length > 0 ? totalAmount[0].total : 0;
+    const sumProdValue = sumProd.length > 0 ? sumProd[0].total : 0;
 
-    // Print values to the console
-    console.log("Total sum of Lo (totalAmount):", totalAmount);
-    console.log("Amount * Fee (sumProd):", sumProd);
+    console.log("Total sum of Lo (totalAmount):", totalAmountValue);
+    console.log("Amount * Fee (sumProd):", sumProdValue);
 
-    // Compute the public rate
+    // Calculate newPR
     let newPublicRate;
-    if (totalAmount === 0) {
-      newPublicRate = user.public_rate; // Or 0, depending on your default behavior
+    if (totalAmountValue === 0) {
+      newPublicRate = user.public_rate;
     } else {
-      newPublicRate = sumProd / totalAmount;
+      newPublicRate = sumProdValue / totalAmountValue;
     }
 
     console.log("New Public Rate:", newPublicRate);
@@ -270,17 +276,17 @@ transactionCtrl.calculateUserData = async (userId) => {
 
     const incomingLinks = Object.values(incomingLinksMap);
 
-    const metabalance = user.balance + totalFees + sumOutgoing - sumIncoming;
+    const metabalance = user.balance + sumIncoming - sumOutgoing;
 
-    return {
+    const userData = {
       balance: user.balance,
       sumOutgoing,
       sumIncoming,
       outgoingLinks,
-      incomingLinks,
-      totalFees,
-      totalIncomingLinks: incomingLinks.length,
       totalOutgoingLinks: outgoingLinks.length,
+      incomingLinks,
+      totalIncomingLinks: incomingLinks.length,
+      totalFees,
       metabalance,
       link_obligation: user.link_obligation,
       link_income: user.link_income,
@@ -288,14 +294,17 @@ transactionCtrl.calculateUserData = async (userId) => {
       public_rate: user.public_rate,
       auxiliary: user.auxiliary,
       trigger: user.trigger,
-      trxCount: user.trxCount,
+      trxCount: user.transactionHistory.length,
     };
+
+    return userData;
   } catch (error) {
     console.error(`Error calculating user data: ${error.message}`);
     throw new Error(`Error calculating user data: ${error.message}`);
   }
 };
 
+// Calculate fee
 transactionCtrl.calculateFee = (amount, feeRate) => {
   return amount * (feeRate / 100);
 };
