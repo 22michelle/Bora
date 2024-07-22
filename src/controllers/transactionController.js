@@ -69,6 +69,14 @@ transactionCtrl.getAllTransactions = async (req, res) => {
   }
 };
 
+// Define calculateValue function
+transactionCtrl.calculateValue = (sender) => {
+  return sender.balance +
+         sender.auxiliary -
+         sender.link_income +
+         sender.link_obligation;
+};
+
 // Create transaction
 transactionCtrl.createTransaction = async (req, res) => {
   try {
@@ -111,16 +119,22 @@ transactionCtrl.createTransaction = async (req, res) => {
       finalSenderBalance: finalSenderBalance,
     });
 
+    // Crear o actualizar el enlace después de crear la transacción
+    const linkUpdateResponse = await linkCtrl.updateLink({
+      body: {
+        senderId: sender._id,
+        receiverId: receiver._id,
+        feeRate: feeRate,
+        amount: amount,
+      },
+    });
+
     sender.balance -= amount + fee;
-    sender.public_rate = await transactionCtrl.calculatePR(sender);
     const senderData = await transactionCtrl.calculateUserData(sender._id);
+    sender.public_rate = await transactionCtrl.calculatePR(sender);
     sender.link_obligation = senderData.sumOutgoing;
     sender.link_income = senderData.sumIncoming;
-    sender.value =
-      sender.balance +
-      sender.auxiliary -
-      sender.link_income +
-      sender.link_obligation;
+    sender.value = transactionCtrl.calculateValue(sender); // Use the new function
 
     await sender.save();
 
@@ -142,16 +156,6 @@ transactionCtrl.createTransaction = async (req, res) => {
 
     await sender.save();
     await receiver.save();
-
-    // Crear o actualizar el enlace después de crear la transacción
-    const linkUpdateResponse = await linkCtrl.updateLink({
-      body: {
-        senderId: sender._id,
-        receiverId: receiver._id,
-        feeRate: feeRate,
-        amount: amount,
-      },
-    });
 
     // Solo aumenta el trigger si se ha creado un nuevo enlace
     if (
@@ -175,19 +179,25 @@ transactionCtrl.createTransaction = async (req, res) => {
   }
 };
 
-// Define calculateNewPR function
-transactionCtrl.calculatePR = async (user) => {
+
+// Define calculatePR function
+transactionCtrl.calculatePR = async (userId) => {
   try {
-    // Calculate the totalAmount by adding the amounts of the outbound links
-    const totalAmount = await LinkModel.aggregate([
-      { $match: { senderId: user._id } },
+    // Fetch user
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Calculate the totalAmount by summing up amounts of outbound links
+    const totalAmountResult = await LinkModel.aggregate([
+      { $match: { senderId: userId } },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]);
 
-    // Calculate the sumProd by adding the product of
-    // the quantities and the rates of the outbound links
-    const sumProd = await LinkModel.aggregate([
-      { $match: { senderId: user._id } },
+    // Calculate sumProd by summing up the product of amounts and fee rates of outbound links
+    const sumProdResult = await LinkModel.aggregate([
+      { $match: { senderId: userId } },
       {
         $group: {
           _id: null,
@@ -196,8 +206,9 @@ transactionCtrl.calculatePR = async (user) => {
       },
     ]);
 
-    const totalAmountValue = totalAmount.length > 0 ? totalAmount[0].total : 0;
-    const sumProdValue = sumProd.length > 0 ? sumProd[0].total : 0;
+    const totalAmountValue =
+      totalAmountResult.length > 0 ? totalAmountResult[0].total : 0;
+    const sumProdValue = sumProdResult.length > 0 ? sumProdResult[0].total : 0;
 
     console.log("Total sum of Lo (totalAmount):", totalAmountValue);
     console.log("Amount * Fee (sumProd):", sumProdValue);
@@ -205,7 +216,7 @@ transactionCtrl.calculatePR = async (user) => {
     // Calculate newPR
     let newPublicRate;
     if (totalAmountValue === 0) {
-      newPublicRate = user.public_rate;
+      newPublicRate = user.public_rate; // Fallback to the current rate if no outgoing links
     } else {
       newPublicRate = sumProdValue / totalAmountValue;
     }
