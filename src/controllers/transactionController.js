@@ -2,6 +2,7 @@ import { response } from "../helpers/Response.js";
 import { UserModel } from "../models/userModel.js";
 import { TransactionModel } from "../models/transactionModel.js";
 import linkCtrl from "./linkController.js";
+import { LinkModel } from "../models/linkModel.js";
 
 const transactionCtrl = {};
 
@@ -82,8 +83,12 @@ transactionCtrl.createTransaction = async (req, res) => {
       return response(res, 400, false, "", "All fields are required");
     }
 
-    const sender = await UserModel.findOne({ accountNumber: senderAccountNumber });
-    const receiver = await UserModel.findOne({ accountNumber: receiverAccountNumber });
+    const sender = await UserModel.findOne({
+      accountNumber: senderAccountNumber,
+    });
+    const receiver = await UserModel.findOne({
+      accountNumber: receiverAccountNumber,
+    });
 
     if (!sender || !receiver) {
       return response(res, 404, false, "", "Sender or receiver not found");
@@ -149,12 +154,21 @@ transactionCtrl.createTransaction = async (req, res) => {
     });
 
     // Solo aumenta el trigger si se ha creado un nuevo enlace
-    if (linkUpdateResponse.success && linkUpdateResponse.message === "Link created successfully") {
+    if (
+      linkUpdateResponse.success &&
+      linkUpdateResponse.message === "Link created successfully"
+    ) {
       receiver.trigger += 1;
       await receiver.save();
     }
 
-    return response(res, 200, true, transaction, "Transaction created successfully");
+    return response(
+      res,
+      200,
+      true,
+      transaction,
+      "Transaction created successfully"
+    );
   } catch (error) {
     console.error(`Error performing transaction: ${error.message}`);
     return response(res, 500, false, null, error.message);
@@ -164,23 +178,23 @@ transactionCtrl.createTransaction = async (req, res) => {
 // Define calculateNewPR function
 transactionCtrl.calculateNewPR = async (user) => {
   try {
-    if (!user.sentTransactions || !Array.isArray(user.sentTransactions)) {
-      console.error("sentTransactions is not defined or not an array");
-      return 0;
-    }
+    // Fetch outgoing links for the user
+    const link_income = await LinkModel.find({ senderId: user._id });
 
-    const totalAmount = user.sentTransactions.reduce(
-      (sum, transaction) => sum + (transaction.amount || 0),
-      0
-    );
-    const sumProd = user.sentTransactions.reduce(
-      (sum, transaction) =>
-        sum + (transaction.amount || 0) * (transaction.fee_rate || 0),
+    // Calculate sums for the formula
+    const sumProd = link_income.reduce(
+      (sum, link) => sum + (link.amount || 0) * (link.feeRate || 0),
       0
     );
 
+    const totalAmount = link_income.reduce(
+      (sum, link) => sum + (link.amount || 0),
+      0
+    );
+
+    // Compute the public rate
     if (totalAmount === 0) {
-      return 0;
+      return user.public_rate; // Or 0, depending on your default behavior
     } else {
       return sumProd / totalAmount;
     }
