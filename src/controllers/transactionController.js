@@ -179,25 +179,33 @@ transactionCtrl.createTransaction = async (req, res) => {
 transactionCtrl.calculateNewPR = async (user) => {
   try {
     // Fetch outgoing links for the user
-    const link_income = await LinkModel.find({ senderId: user._id });
+    const link_obligation = await LinkModel.find({ senderId: user._id });
 
     // Calculate sums for the formula
-    const sumProd = link_income.reduce(
+    const sumProd = link_obligation.reduce(
       (sum, link) => sum + (link.amount || 0) * (link.feeRate || 0),
       0
     );
 
-    const totalAmount = link_income.reduce(
+    const totalAmount = link_obligation.reduce(
       (sum, link) => sum + (link.amount || 0),
       0
     );
 
+    // Print values to the console
+    console.log("Total sum of Lo (totalAmount):", totalAmount);
+    console.log("Amount * Fee (sumProd):", sumProd);
+
     // Compute the public rate
+    let newPublicRate;
     if (totalAmount === 0) {
-      return user.public_rate; // Or 0, depending on your default behavior
+      newPublicRate = user.public_rate; // Or 0, depending on your default behavior
     } else {
-      return sumProd / totalAmount;
+      newPublicRate = sumProd / totalAmount;
     }
+
+    console.log("New Public Rate:", newPublicRate);
+    return newPublicRate;
   } catch (error) {
     console.error(`Error calculating new PR: ${error.message}`);
     throw new Error(`Error calculating new PR: ${error.message}`);
