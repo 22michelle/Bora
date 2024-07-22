@@ -1,25 +1,24 @@
 import { response } from "../helpers/Response.js";
-import { UserModel } from "../models/userModel.js";
+import { LinkModel } from "../models/linkModel.js";
 
 const linkCtrl = {};
 
-// Create Link
+// Create or Update Link
 linkCtrl.updateLink = async (req, res) => {
   try {
-    const { senderId, receiveId, feeRate, amount } = req.body;
-    const newLink = new LinkModel.create(senderId, receiveId, feeRate, amount);
+    const { senderId, receiverId, feeRate, amount } = req.body;
+
+    let link = await LinkModel.findOne({ senderId, receiverId });
 
     if (!link) {
-      link = await LinkModel.create({
-        senderId,
-        receiveId,
-        feeRate,
-        amount,
-      });
+      link = new LinkModel({ senderId, receiverId, feeRate, amount });
       await link.save();
       return response(res, 201, true, link, "Link created successfully");
     } else {
-      return response(res, 200, true, link, "Link found successfully");
+      link.feeRate = feeRate;
+      link.amount += amount; //If link already exist add amount
+      await link.save();
+      return response(res, 200, true, link, "Link updated successfully");
     }
   } catch (error) {
     response(res, 500, false, null, error.message);
@@ -28,8 +27,13 @@ linkCtrl.updateLink = async (req, res) => {
 
 // Get All Links
 linkCtrl.getAllLinks = async (req, res) => {
-    
-}
+  try {
+    const links = await LinkModel.find();
+    return response(res, 200, true, links, "Links obtained successfully");
+  } catch (error) {
+    response(res, 500, false, null, error.message);
+  }
+};
 
 // Get Link by ID
 linkCtrl.getLinkById = async (req, res) => {

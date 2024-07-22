@@ -15,7 +15,7 @@ const LinkSchema = new Schema(
       ref: "User",
       required: true,
     },
-    fee_rate: {
+    feeRate: {
       type: Number,
       required: true,
     },

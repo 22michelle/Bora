@@ -1,6 +1,8 @@
 import { response } from "../helpers/Response.js";
 import { UserModel } from "../models/userModel.js";
 import { TransactionModel } from "../models/transactionModel.js";
+import { LinkModel } from "../models/linkModel.js";
+import linkCtrl from "./linkController.js";
 
 const transactionCtrl = {};
 
@@ -78,9 +80,7 @@ transactionCtrl.createTransaction = async (req, res) => {
     } = req.body;
 
     if (!senderAccountNumber || !receiverAccountNumber || !amount || !feeRate) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "All fields are required" });
+      return response(res, 400, false, "", "All fields are required");
     }
 
     const sender = await UserModel.findOne({
@@ -91,15 +91,11 @@ transactionCtrl.createTransaction = async (req, res) => {
     });
 
     if (!sender || !receiver) {
-      return res
-        .status(404)
-        .json({ ok: false, message: "Sender or receiver not found" });
+      return response(res, 404, false, "", "Sender or receiver not found");
     }
 
     if (sender.balance < amount) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Insufficient balance" });
+      return response(res, 400, false, "", "Insufficient balance");
     }
 
     const fee = amount * (feeRate / 100);
@@ -143,14 +139,20 @@ transactionCtrl.createTransaction = async (req, res) => {
     await sender.save();
     await receiver.save();
 
-    // await transactionCtrl.clearPendingDistributions();
+    // Crear o actualizar el enlace después de crear la transacción
+    await linkCtrl.updateLink({
+      body: {
+        senderId: sender._id,
+        receiverId: receiver._id,
+        feeRate: feeRate,
+        amount: amount,
+      },
+    }, res);
 
-    return res
-      .status(200)
-      .json({ ok: true, data: transaction, message: "Transaction successful" });
+    response(res, 200, true, null, "Transaction successfully");
   } catch (error) {
     console.error(`Error performing transaction: ${error.message}`);
-    return res.status(500).json({ ok: false, message: error.message });
+    return response(res, 500, false, null, error.message);
   }
 };
 
@@ -271,41 +273,5 @@ transactionCtrl.calculateUserData = async (userId) => {
 transactionCtrl.calculateFee = (amount, feeRate) => {
   return amount * (feeRate / 100);
 };
-
-// Function to send amount to admin
-transactionCtrl.sendToAdmin = async (amount) => {
-  try {
-    const account = await AccountModel.findById(1); // Assuming the admin account has ID 1
-
-    if (!account) {
-      throw new Error("Admin account not found");
-    }
-
-    account.balance += 0 * amount; // No change to balance
-    account.auxiliary += 1 * amount; // Increment auxiliary by amount
-    account.trxCount += 1; // Increment transaction count
-    account.value = await transactionCtrl.calculateValue(account); // Calculate new value
-
-    await account.save(); // Save changes to the database
-  } catch (error) {
-    console.error(`Error sending to admin: ${error.message}`);
-    throw new Error(`Error sending to admin: ${error.message}`);
-  }
-};
-
-// transactionCtrl.clearPendingDistributions = async () => {
-//   try {
-//     const pendingDistributions = await UserModel.find({
-//       status: "pending",
-//     });
-//     for (const distribution of pendingDistributions) {
-//       distribution.status = "cleared";
-//       await distribution.save();
-//     }
-//   } catch (error) {
-//     console.error(`Error clearing pending distributions: ${error.message}`);
-//     throw new Error(`Error clearing pending distributions: ${error.message}`);
-//   }
-// };
 
 export default transactionCtrl;
