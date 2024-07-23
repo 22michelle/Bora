@@ -2,6 +2,7 @@ import { response } from "../helpers/Response.js";
 import { UserModel } from "../models/userModel.js";
 import { TransactionModel } from "../models/transactionModel.js";
 import linkCtrl from "./linkController.js";
+import mongoose from "mongoose";
 import { LinkModel } from "../models/linkModel.js";
 
 const transactionCtrl = {};
@@ -14,12 +15,8 @@ transactionCtrl.getAllTransactions = async (req, res) => {
       .populate("senderId receiverId", "name accountNumber");
 
     const userDataPromises = transactions.map(async (transaction) => {
-      const senderData = await transactionCtrl.calculateUserData(
-        transaction.senderId._id
-      );
-      const receiverData = await transactionCtrl.calculateUserData(
-        transaction.receiverId._id
-      );
+      const senderData = await transactionCtrl.calculateUserData(transaction.senderId._id);
+      const receiverData = await transactionCtrl.calculateUserData(transaction.receiverId._id);
 
       return {
         transaction,
@@ -69,34 +66,24 @@ transactionCtrl.getAllTransactions = async (req, res) => {
   }
 };
 
-// Define calculateValue function
-transactionCtrl.calculateValue = (sender) => {
-  return sender.balance +
-         sender.auxiliary -
-         sender.link_income +
-         sender.link_obligation;
+// Define the calculateValue function
+transactionCtrl.calculateValue = (user) => {
+  return user.balance + user.auxiliary - user.link_income + user.link_obligation;
 };
 
-// Create transaction
+// Create Transaction
 transactionCtrl.createTransaction = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const {
-      senderAccountNumber,
-      receiverAccountNumber,
-      amount,
-      feeRate,
-    } = req.body;
+    const { senderAccountNumber, receiverAccountNumber, amount, feeRate } = req.body;
 
     if (!senderAccountNumber || !receiverAccountNumber || !amount || !feeRate) {
       return response(res, 400, false, "", "All fields are required");
     }
 
-    const sender = await UserModel.findOne({
-      accountNumber: senderAccountNumber,
-    });
-    const receiver = await UserModel.findOne({
-      accountNumber: receiverAccountNumber,
-    });
+    const sender = await UserModel.findOne({ accountNumber: senderAccountNumber }).session(session);
+    const receiver = await UserModel.findOne({ accountNumber: receiverAccountNumber }).session(session);
 
     if (!sender || !receiver) {
       return response(res, 404, false, "", "Sender or receiver not found");
@@ -106,96 +93,88 @@ transactionCtrl.createTransaction = async (req, res) => {
       return response(res, 400, false, "", "Insufficient balance");
     }
 
+    // Calculate fee
     const fee = amount * (feeRate / 100);
+
     const initialSenderBalance = sender.balance;
     const finalSenderBalance = sender.balance - (amount + fee);
 
-    const transaction = await TransactionModel.create({
+    const transaction = await TransactionModel.create(
+      [
+        {
+          senderId: sender._id,
+          receiverId: receiver._id,
+          amount: amount,
+          fee_rate: feeRate,
+          initialSenderBalance: initialSenderBalance,
+          finalSenderBalance: finalSenderBalance,
+        },
+      ],
+      { session }
+    );
+
+    // Create or update the link after creating the transaction
+    const linkUpdateResponse = await linkCtrl.updateLink({
       senderId: sender._id,
       receiverId: receiver._id,
+      feeRate: feeRate,
       amount: amount,
-      fee_rate: feeRate,
-      initialSenderBalance: initialSenderBalance,
-      finalSenderBalance: finalSenderBalance,
     });
 
-    // Crear o actualizar el enlace después de crear la transacción
-    const linkUpdateResponse = await linkCtrl.updateLink({
-      body: {
-        senderId: sender._id,
-        receiverId: receiver._id,
-        feeRate: feeRate,
-        amount: amount,
-      },
-    });
-
+    // Update sender's balance and obligations
     sender.balance -= amount + fee;
     const senderData = await transactionCtrl.calculateUserData(sender._id);
-    sender.public_rate = await transactionCtrl.calculatePR(sender);
+    sender.public_rate = await transactionCtrl.calculatePR(sender._id);
     sender.link_obligation = senderData.sumOutgoing;
     sender.link_income = senderData.sumIncoming;
-    sender.value = transactionCtrl.calculateValue(sender); // Use the new function
+    sender.value = transactionCtrl.calculateValue(sender);
 
-    await sender.save();
+    await sender.save({ session });
 
     receiver.balance += amount;
     const receiverData = await transactionCtrl.calculateUserData(receiver._id);
     receiver.link_obligation = receiverData.sumOutgoing;
     receiver.link_income = receiverData.sumIncoming;
-    receiver.value =
-      receiver.balance +
-      receiver.auxiliary -
-      receiver.link_income +
-      receiver.link_obligation;
+    receiver.value = transactionCtrl.calculateValue(receiver);
 
-    await receiver.save();
+    await receiver.save({ session });
 
-    // Update transactionHistory for both sender and receiver
     sender.transactionHistory.push(transaction._id);
     receiver.transactionHistory.push(transaction._id);
 
-    await sender.save();
-    await receiver.save();
+    await sender.save({ session });
+    await receiver.save({ session });
 
-    // Solo aumenta el trigger si se ha creado un nuevo enlace
-    if (
-      linkUpdateResponse.success &&
-      linkUpdateResponse.message === "Link created successfully"
-    ) {
+    if (linkUpdateResponse.success && linkUpdateResponse.message === "Link created successfully") {
       receiver.trigger += 1;
-      await receiver.save();
+      await receiver.save({ session });
     }
 
-    return response(
-      res,
-      200,
-      true,
-      transaction,
-      "Transaction created successfully"
-    );
+    await session.commitTransaction();
+    session.endSession();
+
+    return response(res, 200, true, transaction, "Transaction created successfully");
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error(`Error performing transaction: ${error.message}`);
     return response(res, 500, false, null, error.message);
   }
 };
 
-
-// Define calculatePR function
+// Define the calculatePR function
 transactionCtrl.calculatePR = async (userId) => {
   try {
-    // Fetch user
     const user = await UserModel.findById(userId);
     if (!user) {
       throw new Error("User not found");
     }
 
-    // Calculate the totalAmount by summing up amounts of outbound links
     const totalAmountResult = await LinkModel.aggregate([
       { $match: { senderId: userId } },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]);
 
-    // Calculate sumProd by summing up the product of amounts and fee rates of outbound links
     const sumProdResult = await LinkModel.aggregate([
       { $match: { senderId: userId } },
       {
@@ -206,17 +185,15 @@ transactionCtrl.calculatePR = async (userId) => {
       },
     ]);
 
-    const totalAmountValue =
-      totalAmountResult.length > 0 ? totalAmountResult[0].total : 0;
+    const totalAmountValue = totalAmountResult.length > 0 ? totalAmountResult[0].total : 0;
     const sumProdValue = sumProdResult.length > 0 ? sumProdResult[0].total : 0;
 
     console.log("Total sum of Lo (totalAmount):", totalAmountValue);
     console.log("Amount * Fee (sumProd):", sumProdValue);
 
-    // Calculate newPR
     let newPublicRate;
     if (totalAmountValue === 0) {
-      newPublicRate = user.public_rate; // Fallback to the current rate if no outgoing links
+      newPublicRate = user.public_rate;
     } else {
       newPublicRate = sumProdValue / totalAmountValue;
     }
@@ -225,99 +202,47 @@ transactionCtrl.calculatePR = async (userId) => {
     return newPublicRate;
   } catch (error) {
     console.error(`Error calculating new PR: ${error.message}`);
-    throw new Error(`Error calculating new PR: ${error.message}`);
+    throw error;
   }
 };
 
-// Calculate userData
 transactionCtrl.calculateUserData = async (userId) => {
-  try {
-    const user = await UserModel.findById(userId);
-    const outgoingTransactions = await TransactionModel.find({
-      senderId: userId,
-    }).populate("receiverId", "name _id");
-    const incomingTransactions = await TransactionModel.find({
-      receiverId: userId,
-    }).populate("senderId", "name _id");
+  const user = await UserModel.findById(userId);
+  const outgoingLinks = await LinkModel.find({ senderId: userId });
+  const incomingLinks = await LinkModel.find({ receiverId: userId });
+  const sumOutgoing = outgoingLinks.reduce((sum, link) => sum + link.amount, 0);
+  const sumIncoming = incomingLinks.reduce((sum, link) => sum + link.amount, 0);
+  const metabalance = user.balance + user.auxiliary - sumIncoming + sumOutgoing;
 
-    const sumOutgoing = outgoingTransactions.reduce(
-      (sum, tx) => sum + tx.amount,
-      0
-    );
-    const sumIncoming = incomingTransactions.reduce(
-      (sum, tx) => sum + tx.amount,
-      0
-    );
-    const totalFees = outgoingTransactions.reduce(
-      (sum, tx) => sum + transactionCtrl.calculateFee(tx.amount, tx.fee_rate),
-      0
-    );
-
-    // Aggregate outgoing links by receiverId
-    const outgoingLinksMap = outgoingTransactions.reduce((acc, tx) => {
-      const key = tx.receiverId._id.toString();
-      if (!acc[key]) {
-        acc[key] = {
-          receiverId: tx.receiverId._id,
-          receiverName: tx.receiverId.name,
-          amount: 0,
-          feeRate: tx.fee_rate,
-        };
-      }
-      acc[key].amount += tx.amount;
-      return acc;
-    }, {});
-
-    const outgoingLinks = Object.values(outgoingLinksMap);
-
-    // Aggregate incoming links by senderId
-    const incomingLinksMap = incomingTransactions.reduce((acc, tx) => {
-      const key = tx.senderId._id.toString();
-      if (!acc[key]) {
-        acc[key] = {
-          senderId: tx.senderId._id,
-          senderName: tx.senderId.name,
-          amount: 0,
-          feeRate: tx.fee_rate,
-        };
-      }
-      acc[key].amount += tx.amount;
-      return acc;
-    }, {});
-
-    const incomingLinks = Object.values(incomingLinksMap);
-
-    const metabalance = user.balance + sumIncoming - sumOutgoing;
-
-    const userData = {
-      balance: user.balance,
-      sumOutgoing,
-      sumIncoming,
-      outgoingLinks,
-      totalOutgoingLinks: outgoingLinks.length,
-      incomingLinks,
-      totalIncomingLinks: incomingLinks.length,
-      totalFees,
-      metabalance,
-      link_obligation: user.link_obligation,
-      link_income: user.link_income,
-      value: user.value,
-      public_rate: user.public_rate,
-      auxiliary: user.auxiliary,
-      trigger: user.trigger,
-      trxCount: user.transactionHistory.length,
-    };
-
-    return userData;
-  } catch (error) {
-    console.error(`Error calculating user data: ${error.message}`);
-    throw new Error(`Error calculating user data: ${error.message}`);
-  }
+  return {
+    balance: user.balance,
+    sumOutgoing,
+    sumIncoming,
+    outgoingLinks,
+    totalOutgoingLinks: outgoingLinks.length,
+    incomingLinks,
+    totalIncomingLinks: incomingLinks.length,
+    metabalance,
+    link_obligation: sumOutgoing,
+    link_income: sumIncoming,
+    value: transactionCtrl.calculateValue(user),
+    public_rate: user.public_rate,
+    auxiliary: user.auxiliary,
+    trigger: user.trigger,
+    trxCount: user.trxCount,
+  };
 };
 
-// Calculate fee
-transactionCtrl.calculateFee = (amount, feeRate) => {
-  return amount * (feeRate / 100);
+// Define sendToAdmin function
+transactionCtrl.sendToAdmin = async (amount) => {
+  const adminAccount = await UserModel.findById(1);
+  if (adminAccount) {
+    adminAccount.balance += 0 * amount;
+    adminAccount.auxiliary += 1 * amount;
+    adminAccount.trxCount += 1;
+    adminAccount.value = transactionCtrl.calculateValue(adminAccount);
+    await adminAccount.save();
+  }
 };
 
 export default transactionCtrl;

@@ -4,32 +4,35 @@ import { LinkModel } from "../models/linkModel.js";
 const linkCtrl = {};
 
 // Create or Update Link
-linkCtrl.updateLink = async (req) => {
+linkCtrl.updateLink = async (data) => {
   try {
-    const { senderId, receiverId, feeRate, amount } = req.body;
+    const { senderId, receiverId, feeRate, amount } = data;
 
     let link = await LinkModel.findOne({ senderId, receiverId });
 
     if (link) {
       let newRate = link.feeRate;
-      // Update rate only if new rate is not 0
-      if (feeRate !== 0) {
-        newRate =
-          (link.amount * link.feeRate + amount * feeRate) /
-          (link.amount + amount);
+      if (link.feeRate < feeRate) {
+        newRate = feeRate;
       }
-      // Update the link with the new amount and rate
+
       link.amount += amount;
       link.feeRate = newRate;
+      await link.save();
+      return { success: true, message: "Link updated successfully" };
+    } else {
+      link = new LinkModel({
+        senderId,
+        receiverId,
+        amount,
+        feeRate,
+      });
 
       await link.save();
-      return { success: true, message: "Link created successfully", link };
-    } else {
-      link = new LinkModel({ senderId, receiverId, feeRate, amount });
-      await link.save();
-      return { success: true, message: "Link updated successfully", link };
+      return { success: true, message: "Link created successfully" };
     }
   } catch (error) {
+    console.error(`Error creating or updating link: ${error.message}`);
     return { success: false, message: error.message };
   }
 };
