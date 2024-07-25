@@ -1,6 +1,7 @@
 import { response } from "../helpers/Response.js";
 import { UserModel } from "../models/userModel.js";
 import { TransactionModel } from "../models/transactionModel.js";
+import { LinkModel } from "../models/linkModel.js";
 import linkCtrl from "./linkController.js";
 
 const transactionCtrl = {};
@@ -8,7 +9,12 @@ const transactionCtrl = {};
 // Create Transaction
 transactionCtrl.createTransaction = async (req, res) => {
   try {
-    const { senderAccountNumber, receiverAccountNumber, amount, feeRate } = req.body;
+    const {
+      senderAccountNumber,
+      receiverAccountNumber,
+      amount,
+      feeRate,
+    } = req.body;
 
     // Validate required fields
     if (!senderAccountNumber || !receiverAccountNumber || !amount || !feeRate) {
@@ -19,8 +25,12 @@ transactionCtrl.createTransaction = async (req, res) => {
     const fee = amount * (feeRate / 100);
 
     // Find sender and receiver
-    const sender = await UserModel.findOne({ accountNumber: senderAccountNumber });
-    const receiver = await UserModel.findOne({ accountNumber: receiverAccountNumber });
+    const sender = await UserModel.findOne({
+      accountNumber: senderAccountNumber,
+    });
+    const receiver = await UserModel.findOne({
+      accountNumber: receiverAccountNumber,
+    });
 
     if (!sender || !receiver) {
       return response(res, 404, false, "", "Sender or receiver not found");
@@ -36,8 +46,8 @@ transactionCtrl.createTransaction = async (req, res) => {
 
     // Update sender-receiver link
     await linkCtrl.updateLink({
-      senderName: sender.name, // Add sender name
-      receiverName: receiver.name, // Add receiver name
+      senderName: sender.name,
+      receiverName: receiver.name,
       senderId: sender._id,
       receiverId: receiver._id,
       feeRate: feeRate,
@@ -49,8 +59,8 @@ transactionCtrl.createTransaction = async (req, res) => {
     const admin = await UserModel.findById(adminId);
     if (admin) {
       await linkCtrl.updateLink({
-        senderName: receiver.name, // Add sender name
-        receiverName: admin.name, // Add receiver name
+        senderName: receiver.name,
+        receiverName: admin.name,
         senderId: receiver._id,
         receiverId: admin._id,
         feeRate: receiver.public_rate,
@@ -60,13 +70,14 @@ transactionCtrl.createTransaction = async (req, res) => {
       // Update admin account
       admin.auxiliary += fee;
       admin.trxCount += 1;
+      admin.value = await transactionCtrl.calculateValue(admin);
       await admin.save();
     }
 
     // Create transaction
     const transaction = await TransactionModel.create({
-      senderName: sender.name, // Add sender name
-      receiverName: receiver.name, // Add receiver name
+      senderName: sender.name,
+      receiverName: receiver.name,
       senderId: sender._id,
       receiverId: receiver._id,
       amount: amount,
@@ -75,6 +86,13 @@ transactionCtrl.createTransaction = async (req, res) => {
       finalSenderBalance: sender.balance,
     });
 
+    // Calculate value for sender and receiver
+    sender.value = await transactionCtrl.calculateValue(sender);
+    receiver.value = await transactionCtrl.calculateValue(receiver);
+
+    // Temporarily comment out calculatePR
+    // sender.public_rate = await transactionCtrl.calculatePR(sender._id);
+
     // Save sender and receiver transaction history
     sender.transactionHistory.push(transaction._id);
     await sender.save();
@@ -82,11 +100,35 @@ transactionCtrl.createTransaction = async (req, res) => {
     await receiver.save();
 
     // Return success response
-    return response(res, 200, true, transaction, "Transaction created successfully");
+    return response(
+      res,
+      200,
+      true,
+      transaction,
+      "Transaction created successfully"
+    );
   } catch (error) {
     console.error(`Error performing transaction: ${error.message}`);
     return response(res, 500, false, null, error.message);
   }
+};
+
+// Calculate value for a user
+transactionCtrl.calculateValue = async (user) => {
+  const linkObligation = await LinkModel.aggregate([
+    { $match: { senderId: user._id } },
+    { $group: { _id: null, total: { $sum: "$amount" } } },
+  ]);
+
+  const linkIncome = await LinkModel.aggregate([
+    { $match: { receiverId: user._id } },
+    { $group: { _id: null, total: { $sum: "$amount" } } },
+  ]);
+
+  const totalObligation = linkObligation[0]?.total || 0;
+  const totalIncome = linkIncome[0]?.total || 0;
+
+  return user.balance + user.auxiliary + totalObligation - totalIncome;
 };
 
 // Get All Transactions
@@ -104,7 +146,13 @@ transactionCtrl.getAllTransactions = async (req, res) => {
 
     const userData = await Promise.all(userDataPromises);
 
-    return response(res, 200, true, userData, "Transactions obtained successfully");
+    return response(
+      res,
+      200,
+      true,
+      userData,
+      "Transactions obtained successfully"
+    );
   } catch (error) {
     console.error(`Error fetching transactions: ${error.message}`);
     return response(res, 500, false, null, error.message);
