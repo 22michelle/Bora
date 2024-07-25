@@ -8,19 +8,17 @@ const transactionCtrl = {};
 // Create Transaction
 transactionCtrl.createTransaction = async (req, res) => {
   try {
-    const {
-      senderAccountNumber,
-      receiverAccountNumber,
-      amount,
-      feeRate,
-    } = req.body;
+    const { senderAccountNumber, receiverAccountNumber, amount, feeRate } = req.body;
 
-    // Calculate fee
-    const fee = amount * (feeRate / 100);
+    // Validate required fields
     if (!senderAccountNumber || !receiverAccountNumber || !amount || !feeRate) {
       return response(res, 400, false, "", "All fields are required");
     }
 
+    // Calculate fee
+    const fee = amount * (feeRate / 100);
+
+    // Find sender and receiver
     const sender = await UserModel.findOne({ accountNumber: senderAccountNumber });
     const receiver = await UserModel.findOne({ accountNumber: receiverAccountNumber });
 
@@ -38,6 +36,8 @@ transactionCtrl.createTransaction = async (req, res) => {
 
     // Update sender-receiver link
     await linkCtrl.updateLink({
+      senderName: sender.name, // Add sender name
+      receiverName: receiver.name, // Add receiver name
       senderId: sender._id,
       receiverId: receiver._id,
       feeRate: feeRate,
@@ -49,6 +49,8 @@ transactionCtrl.createTransaction = async (req, res) => {
     const admin = await UserModel.findById(adminId);
     if (admin) {
       await linkCtrl.updateLink({
+        senderName: receiver.name, // Add sender name
+        receiverName: admin.name, // Add receiver name
         senderId: receiver._id,
         receiverId: admin._id,
         feeRate: receiver.public_rate,
@@ -63,6 +65,8 @@ transactionCtrl.createTransaction = async (req, res) => {
 
     // Create transaction
     const transaction = await TransactionModel.create({
+      senderName: sender.name, // Add sender name
+      receiverName: receiver.name, // Add receiver name
       senderId: sender._id,
       receiverId: receiver._id,
       amount: amount,
@@ -78,13 +82,7 @@ transactionCtrl.createTransaction = async (req, res) => {
     await receiver.save();
 
     // Return success response
-    return response(
-      res,
-      200,
-      true,
-      transaction,
-      "Transaction created successfully"
-    );
+    return response(res, 200, true, transaction, "Transaction created successfully");
   } catch (error) {
     console.error(`Error performing transaction: ${error.message}`);
     return response(res, 500, false, null, error.message);
@@ -106,61 +104,11 @@ transactionCtrl.getAllTransactions = async (req, res) => {
 
     const userData = await Promise.all(userDataPromises);
 
-    response(res, 200, true, userData, "Transactions obtained successfully");
+    return response(res, 200, true, userData, "Transactions obtained successfully");
   } catch (error) {
-    response(res, 500, false, null, error.message);
+    console.error(`Error fetching transactions: ${error.message}`);
+    return response(res, 500, false, null, error.message);
   }
 };
-
-// Define the calculateValue function
-// transactionCtrl.calculateValue = (user) => {
-//   return (
-//     user.balance + user.auxiliary - user.link_income + user.link_obligation
-//   );
-// };
-
-// Define the calculatePR function
-// transactionCtrl.calculatePR = async (userId) => {
-//   try {
-//     const user = await UserModel.findById(userId);
-//     if (!user) {
-//       throw new Error("User not found");
-//     }
-
-//     const totalAmountResult = await LinkModel.aggregate([
-//       { $match: { senderId: userId } },
-//       { $group: { _id: null, total: { $sum: "$amount" } } },
-//     ]);
-
-//     const sumProdResult = await LinkModel.aggregate([
-//       { $match: { senderId: userId } },
-//       {
-//         $group: {
-//           _id: null,
-//           total: { $sum: { $multiply: ["$amount", "$feeRate"] } },
-//         },
-//       },
-//     ]);
-
-//     const totalAmountValue =
-//       totalAmountResult.length > 0 ? totalAmountResult[0].total : 0;
-//     const sumProdValue = sumProdResult.length > 0 ? sumProdResult[0].total : 0;
-
-//     let newPublicRate;
-//     if (totalAmountValue === 0) {
-//       newPublicRate = user.public_rate;
-//     } else {
-//       newPublicRate = sumProdValue / totalAmountValue;
-//     }
-
-//     return newPublicRate;
-//   } catch (error) {
-//     console.error(`Error calculating new PR: ${error.message}`);
-//     throw error;
-//   }
-// };
-
-// Define clearDistributions function (if needed)
-transactionCtrl.clearDistributions = () => {};
 
 export default transactionCtrl;

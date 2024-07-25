@@ -23,6 +23,8 @@ const LinkSchema = new Schema(
       type: Number,
       required: true,
     },
+    senderName: { type: String },
+    receiverName: { type: String },
   },
   { timestamps: true }
 );

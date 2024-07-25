@@ -7,7 +7,8 @@ const linkCtrl = {};
 // Create or Update Link
 linkCtrl.updateLink = async (data) => {
   try {
-    const { senderId, receiverId, feeRate, amount } = data;
+    const { senderId, receiverId, feeRate, amount, senderName, receiverName } = data;
+    const adminId = "669abda01a463bfc44b0b5a7";
 
     let link = await LinkModel.findOne({ senderId, receiverId });
 
@@ -19,6 +20,8 @@ linkCtrl.updateLink = async (data) => {
 
       link.amount += amount;
       link.feeRate = newRate;
+      link.senderName = senderName;
+      link.receiverName = receiverName;
       await link.save();
       return { success: true, message: "Link updated successfully" };
     } else {
@@ -27,15 +30,16 @@ linkCtrl.updateLink = async (data) => {
         receiverId,
         amount,
         feeRate,
+        senderName,
+        receiverName,
       });
 
       await link.save();
 
-      // Skip trigger update for admin account (assumed admin account has ID 1)
-      if (receiverId !== 'admin') {
+      if (receiverId.toString() !== adminId) {
         const receiver = await UserModel.findById(receiverId);
         if (receiver) {
-          receiver.trigger += 1; // Increment trigger only if not admin
+          receiver.trigger += 1;
           await receiver.save();
         }
       }
@@ -48,10 +52,14 @@ linkCtrl.updateLink = async (data) => {
   }
 };
 
+
 // Get All Links
 linkCtrl.getAllLinks = async (req, res) => {
   try {
-    const links = await LinkModel.find();
+    const links = await LinkModel.find()
+      .populate('senderId', 'name')
+      .populate('receiverId', 'name');
+
     return response(res, 200, true, links, "Links obtained successfully");
   } catch (error) {
     response(res, 500, false, null, error.message);
@@ -62,7 +70,10 @@ linkCtrl.getAllLinks = async (req, res) => {
 linkCtrl.getLinkById = async (req, res) => {
   try {
     const linkId = req.params.linkId;
-    const link = await LinkModel.findById(linkId);
+    const link = await LinkModel.findById(linkId)
+      .populate('senderId', 'name')
+      .populate('receiverId', 'name');
+
     if (!link) {
       return response(res, 404, false, null, "Link not found");
     } else {
