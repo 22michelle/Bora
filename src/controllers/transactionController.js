@@ -6,6 +6,13 @@ import linkCtrl from "./linkController.js";
 
 const transactionCtrl = {};
 
+// Initialize users
+const initializeUsers = async () => {
+  await UserModel.updateMany({}, { $set: { public_rate: 10 } });
+  await UserModel.updateOne({ _id: "669abda01a463bfc44b0b5a7" }, { $set: { trigger: 3 } });
+};
+initializeUsers();
+
 // Create Transaction
 transactionCtrl.createTransaction = async (req, res) => {
   try {
@@ -90,8 +97,8 @@ transactionCtrl.createTransaction = async (req, res) => {
     sender.value = await transactionCtrl.calculateValue(sender);
     receiver.value = await transactionCtrl.calculateValue(receiver);
 
-    // Temporarily comment out calculatePR
-    // sender.public_rate = await transactionCtrl.calculatePR(sender._id);
+    // Calculate PR for sender
+    sender.public_rate = await transactionCtrl.calculatePR(sender);
 
     // Save sender and receiver transaction history
     sender.transactionHistory.push(transaction._id);
@@ -129,6 +136,28 @@ transactionCtrl.calculateValue = async (user) => {
   const totalIncome = linkIncome[0]?.total || 0;
 
   return user.balance + user.auxiliary + totalObligation - totalIncome;
+};
+
+// Calculate public rate for a user
+transactionCtrl.calculatePR = async (user) => {
+  const totalAmount = await LinkModel.aggregate([
+    { $match: { senderId: user._id } },
+    { $group: { _id: null, total: { $sum: "$amount" } } },
+  ]);
+
+  const sumProd = await LinkModel.aggregate([
+    { $match: { senderId: user._id } },
+    { $group: { _id: null, total: { $sum: { $multiply: ["$amount", "$feeRate"] } } } },
+  ]);
+
+  const totalAmountValue = totalAmount[0]?.total || 0;
+  const sumProdValue = sumProd[0]?.total || 0;
+
+  if (totalAmountValue === 0) {
+    return user.public_rate;
+  } else {
+    return sumProdValue / totalAmountValue;
+  }
 };
 
 // Get All Transactions
