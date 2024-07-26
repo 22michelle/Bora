@@ -234,86 +234,90 @@ transactionCtrl.clearPendingDistributions = async () => {
 // Distribute function (to be implemented as needed)
 transactionCtrl.Distribute = async (user) => {
   try {
-    console.log(`Distributing for user: ${user.name}`);
+    console.log('Distributing for user:', user._id);
 
     const distributionAmount = user.auxiliary;
-    const initialLinkIncome = user.link_income;
 
-    // Get all participants (senders to the user and the user itself)
-    const senders = await LinkModel.find({
-      receiverId: user._id,
-    }).distinct('senderId');
+    // Identify the links related to the user
+    const links = await LinkModel.find({ receiverId: user._id });
 
-    // Log senders for debugging
-    console.log('Senders found:', senders.length);
-    senders.forEach(sender => console.log('Sender ID:', sender));
+    let totalPR = 0;
+    const participants = [];
 
-    // List to hold actual participants
-    const actualParticipants = [];
-
-    for (const senderId of senders) {
-      const participant = await UserModel.findById(senderId);
-      if (participant && participant.balance < participant.value) {
-        actualParticipants.push(participant);
-        console.log('Eligible participant added:', participant._id, '-', participant.name);
-      } else {
-        console.log('Participant not eligible:', participant ? participant._id : 'Unknown', '-', participant ? participant.name : 'Unknown');
-      }
+    // Sum up the PR values of participants
+    for (const link of links) {
+      const participant = await UserModel.findById(link.senderId);
+      totalPR += participant.public_rate;
+      console.log(participant.public_rate);
+      participants.push(participant);
     }
 
-    // Also consider the user itself as a potential participant
+    // Check if the user should participate in the distribution
     if (user.balance < user.value) {
-      actualParticipants.push(user);
-      console.log('User itself added as participant:', user._id, '-', user.name);
+      participants.push(user);
+      totalPR += user.public_rate;
     }
 
-    // Log actual participants for debugging
-    console.log('Total actual participants:', actualParticipants.length);
-    actualParticipants.forEach(participant => console.log('Participant ID:', participant._id, ', Public Rate:', participant.public_rate));
+    console.log('Total PR:', totalPR);
 
-    if (actualParticipants.length === 0) {
-      console.log('No eligible participants found for user:', user._id);
-      return;
+    // Only distribute if totalPR is greater than zero
+    if (totalPR > 0) {
+      // Calculate and distribute shares for each participant
+      for (const participant of participants) {
+        const pr = participant.public_rate > 0 ? participant.public_rate : 10; // Assuming a minimum PR of 10
+
+        const share = distributionAmount * (pr / totalPR);
+        console.log('Share for', participant.name, ':', share);
+
+        if (share > 0) {
+          console.log(share, 'goes to', participant.name);
+          await transactionCtrl.createDistributionTransaction(user, participant, share);
+        }
+      }
+    } else {
+      console.warn('Total PR is zero, distribution skipped for user:', user._id);
     }
 
-    // Collect IDs of actual participants
-    const participantIds = actualParticipants.map(participant => participant._id);
-    console.log('Participant IDs:', participantIds);
-
-    // Sum public rates of actual participants
-    const sumPublicRates = await UserModel.aggregate([
-      { $match: { _id: { $in: participantIds } } },
-      { $group: { _id: null, total: { $sum: "$public_rate" } } },
-    ]);
-
-    console.log('Sum of public rates:', sumPublicRates);
-
-    // Distribute amount based on public rates
-    const totalPublicRates = sumPublicRates[0]?.total || 0;
-    if (totalPublicRates === 0) {
-      console.log('Sum of public rates is zero for user:', user._id);
-      return;
-    }
-
-    for (const participant of actualParticipants) {
-      const distributionShare = distributionAmount * (participant.public_rate / totalPublicRates);
-
-      participant.link_income += distributionShare;
-      participant.balance += distributionShare;
-      await participant.save();
-
-      console.log('Distributed to participant:', participant._id, ', Amount:', distributionShare);
-    }
-
-    // Reset user auxiliary and link income
-    user.auxiliary = 0;
-    user.link_income = initialLinkIncome;
+    // Reset the transaction count (trxCount) to zero
     user.trxCount = 0;
     await user.save();
-
-    console.log(`Distribution completed successfully for user: ${user.name}`);
   } catch (error) {
-    console.error(`Error during distribution: ${error.message}`);
+    console.error(`Error distributing for user: ${user._id}`, error.message);
+  }
+};
+
+// Create a distribution transaction
+transactionCtrl.createDistributionTransaction = async (distributor, recipient, share) => {
+  try {
+    // Update balances of distributor and recipient
+    distributor.balance -= share;
+    recipient.balance += share;
+
+    // Save updated balances
+    await distributor.save();
+    await recipient.save();
+
+    // Create and save the distribution transaction record
+    const transaction = await TransactionModel.create({
+      senderName: distributor.name,
+      receiverName: recipient.name,
+      senderId: distributor._id,
+      receiverId: recipient._id,
+      amount: share,
+      fee_rate: 0,  // No fee for distribution transactions
+      initialSenderBalance: distributor.balance + share,
+      finalSenderBalance: distributor.balance,
+    });
+
+    // Add transaction ID to transaction histories
+    distributor.transactionHistory.push(transaction._id);
+    recipient.transactionHistory.push(transaction._id);
+    await distributor.save();
+    await recipient.save();
+
+    console.log('Distribution transaction created successfully:', transaction._id);
+  } catch (error) {
+    console.error('Error creating distribution transaction:', error.message);
   }
 };
 
