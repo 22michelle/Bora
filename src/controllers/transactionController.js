@@ -238,13 +238,13 @@ transactionCtrl.Distribute = async (user) => {
 
     const distributionAmount = user.auxiliary;
 
-    // Identify the links related to the user
+    // Identify all links where the user is the receiver
     const links = await LinkModel.find({ receiverId: user._id });
 
     let totalPR = 0;
     const participants = [];
 
-    // Sum up the PR values of participants
+    // Sum up PR values for each participant
     for (const link of links) {
       const participant = await UserModel.findById(link.senderId);
       totalPR += participant.public_rate;
@@ -252,33 +252,26 @@ transactionCtrl.Distribute = async (user) => {
       participants.push(participant);
     }
 
-    // Check if the user should participate in the distribution
+    // Check if the user should also be considered as a participant
     if (user.balance < user.value) {
       participants.push(user);
       totalPR += user.public_rate;
     }
 
-    console.log('Total PR:', totalPR);
+    // Calculate and distribute shares for each participant
+    for (const participant of participants) {
+      const pr = participant.public_rate > 0 ? participant.public_rate : 10; // Assuming a minimum PR of 10
 
-    // Only distribute if totalPR is greater than zero
-    if (totalPR > 0) {
-      // Calculate and distribute shares for each participant
-      for (const participant of participants) {
-        const pr = participant.public_rate > 0 ? participant.public_rate : 10; // Assuming a minimum PR of 10
+      const share = distributionAmount * (pr / totalPR);
+      console.log('Share for', participant.name, ':', share);
 
-        const share = distributionAmount * (pr / totalPR);
-        console.log('Share for', participant.name, ':', share);
-
-        if (share > 0) {
-          console.log(share, 'goes to', participant.name);
-          await transactionCtrl.createDistributionTransaction(user, participant, share);
-        }
+      if (share > 0) {
+        console.log(share, 'goes to', participant.name);
+        await transactionCtrl.createDistributionTransaction(user, participant, share);
       }
-    } else {
-      console.warn('Total PR is zero, distribution skipped for user:', user._id);
     }
 
-    // Reset the transaction count (trxCount) to zero
+    // Reset transaction count (trxCount) to zero after distribution
     user.trxCount = 0;
     await user.save();
   } catch (error) {
