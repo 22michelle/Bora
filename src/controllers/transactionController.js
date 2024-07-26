@@ -63,17 +63,23 @@ initializeUsers();
 // Create Transaction
 transactionCtrl.createTransaction = async (req, res) => {
   try {
-    const { senderAccountNumber, receiverAccountNumber, amount, feeRate } = req.body;
+    const {
+      senderAccountNumber,
+      receiverAccountNumber,
+      amount,
+      feeRate,
+    } = req.body;
 
     // Validate required fields
-    if (!senderAccountNumber || !receiverAccountNumber || !amount || !feeRate) {
+    if (
+      !senderAccountNumber ||
+      !receiverAccountNumber ||
+      !amount ||
+      feeRate === undefined
+    ) {
       return response(res, 400, false, "", "All fields are required");
     }
 
-    // Calculate fee
-    const fee = amount * (feeRate / 100);
-
-    // Find sender and receiver
     const sender = await UserModel.findOne({
       accountNumber: senderAccountNumber,
     });
@@ -85,42 +91,56 @@ transactionCtrl.createTransaction = async (req, res) => {
       return response(res, 404, false, "", "Sender or receiver not found");
     }
 
+    // Calculate fee
+    const fee = feeRate > 0 ? amount * (feeRate / 100) : 0;
+
+    // Check for sufficient balance
     if (sender.balance < amount + fee) {
       return response(res, 400, false, "", "Insufficient balance");
     }
 
-    // Update balances
-    sender.balance -= amount + fee;
-    receiver.balance += amount;
+    if (feeRate === 0) {
+      // If feeRate is 0, process transaction without links
+      sender.balance -= amount;
+      receiver.balance += amount;
+    } else {
+      // If feeRate is greater than 0, process transaction with links
+      sender.balance -= amount + fee;
+      receiver.balance += amount;
 
-    // Update sender-receiver link
-    await linkCtrl.updateLink({
-      senderName: sender.name,
-      receiverName: receiver.name,
-      senderId: sender._id,
-      receiverId: receiver._id,
-      feeRate: feeRate,
-      amount: amount,
-    });
-
-    // Update receiver-admin link
-    const adminId = "669abda01a463bfc44b0b5a7";
-    const admin = await UserModel.findById(adminId);
-    if (admin) {
+      // Update sender-receiver link
       await linkCtrl.updateLink({
-        senderName: receiver.name,
-        receiverName: admin.name,
-        senderId: receiver._id,
-        receiverId: admin._id,
-        feeRate: receiver.public_rate,
-        amount: fee,
+        senderName: sender.name,
+        receiverName: receiver.name,
+        senderId: sender._id,
+        receiverId: receiver._id,
+        feeRate: feeRate,
+        amount: amount,
       });
 
-      // Update admin account
-      admin.auxiliary += fee;
-      admin.trxCount += 1;
-      admin.value = await transactionCtrl.calculateValue(admin);
-      await admin.save();
+      // Update receiver-admin link
+      const adminId = "669abda01a463bfc44b0b5a7";
+      const admin = await UserModel.findById(adminId);
+      if (admin) {
+        await linkCtrl.updateLink({
+          senderName: receiver.name,
+          receiverName: admin.name,
+          senderId: receiver._id,
+          receiverId: admin._id,
+          feeRate: receiver.public_rate,
+          amount: fee,
+        });
+
+        // Update admin account
+        admin.auxiliary += fee;
+        admin.trxCount += 1;
+        admin.value = await transactionCtrl.calculateValue(admin);
+        await admin.save();
+
+        console.log(
+          `Updated admin ${admin.name}: Auxiliary = ${admin.auxiliary}, Transaction Count = ${admin.trxCount}`
+        );
+      }
     }
 
     // Create transaction
@@ -139,8 +159,10 @@ transactionCtrl.createTransaction = async (req, res) => {
     sender.value = await transactionCtrl.calculateValue(sender);
     receiver.value = await transactionCtrl.calculateValue(receiver);
 
-    // Calculate PR for sender
-    sender.public_rate = await transactionCtrl.calculatePR(sender);
+    // Calculate PR for sender if feeRate is greater than 0
+    if (feeRate > 0) {
+      sender.public_rate = await transactionCtrl.calculatePR(sender);
+    }
 
     // Save sender and receiver transaction history
     sender.transactionHistory.push(transaction._id);
@@ -163,24 +185,6 @@ transactionCtrl.createTransaction = async (req, res) => {
     console.error(`Error performing transaction: ${error.message}`);
     return response(res, 500, false, null, error.message);
   }
-};
-
-// Calculate value for a user
-transactionCtrl.calculateValue = async (user) => {
-  const linkObligation = await LinkModel.aggregate([
-    { $match: { senderId: user._id } },
-    { $group: { _id: null, total: { $sum: "$amount" } } },
-  ]);
-
-  const linkIncome = await LinkModel.aggregate([
-    { $match: { receiverId: user._id } },
-    { $group: { _id: null, total: { $sum: "$amount" } } },
-  ]);
-
-  const totalObligation = linkObligation[0]?.total || 0;
-  const totalIncome = linkIncome[0]?.total || 0;
-
-  return user.balance + user.auxiliary + totalObligation - totalIncome;
 };
 
 // Calculate public rate for a user
@@ -218,10 +222,15 @@ transactionCtrl.clearPendingDistributions = async () => {
     // Log the users obtained from the query
     console.log("All users:", users);
 
-    const usersWithPendingDistributions = users.filter(user => user.trxCount >= user.trigger + 1);
+    const usersWithPendingDistributions = users.filter(
+      (user) => user.trxCount >= user.trigger + 1
+    );
 
     // Log the users that meet the condition
-    console.log("Users with pending distributions:", usersWithPendingDistributions);
+    console.log(
+      "Users with pending distributions:",
+      usersWithPendingDistributions
+    );
 
     for (const user of usersWithPendingDistributions) {
       await transactionCtrl.Distribute(user);
@@ -234,7 +243,7 @@ transactionCtrl.clearPendingDistributions = async () => {
 // Distribute function (to be implemented as needed)
 transactionCtrl.Distribute = async (user) => {
   try {
-    console.log('Distributing for user:', user._id);
+    console.log("Distributing for user:", user._id);
 
     const distributionAmount = user.auxiliary;
 
@@ -260,11 +269,15 @@ transactionCtrl.Distribute = async (user) => {
 
     // Calculate and distribute shares for each participant
     for (const participant of participants) {
-      const share = distributionAmount * participant.public_rate / totalPR;
-      
+      const share = (distributionAmount * participant.public_rate) / totalPR;
+
       // Log the share distribution and create the transaction
       console.log(`${user.name}, to ${participant.name}, ${share}`);
-      await transactionCtrl.createDistributionTransaction(user, participant, share);
+      await transactionCtrl.clearteDistributionTransaction(
+        user,
+        participant,
+        share
+      );
     }
 
     // Reset transaction count (trxCount) to zero after distribution
@@ -276,7 +289,11 @@ transactionCtrl.Distribute = async (user) => {
 };
 
 // Create a distribution transaction
-transactionCtrl.createDistributionTransaction = async (distributor, participant, share) => {
+transactionCtrl.clearteDistributionTransaction = async (
+  distributor,
+  participant,
+  share
+) => {
   try {
     // Check if the distributor and participant are the same
     if (distributor._id.equals(participant._id)) {
@@ -287,12 +304,14 @@ transactionCtrl.createDistributionTransaction = async (distributor, participant,
       // Save the participant's updated details
       await participant.save();
 
-      console.log(`Updated ${participant.name}: Balance = ${participant.balance}, Auxiliary = ${participant.auxiliary}`);
+      console.log(
+        `Updated ${participant.name}: Balance = ${participant.balance}, Auxiliary = ${participant.auxiliary}`
+      );
     } else {
       // Get the link value (assuming a link exists between participant and distributor)
       const link = await LinkModel.findOne({
         senderId: participant._id,
-        receiverId: distributor._id
+        receiverId: distributor._id,
       });
 
       // Check if the link exists and get its value
@@ -310,17 +329,24 @@ transactionCtrl.createDistributionTransaction = async (distributor, participant,
           await participant.save();
           await distributor.save();
 
-          console.log(`Updated ${participant.name}: Auxiliary = ${participant.auxiliary}, Transaction Count = ${participant.trxCount}`);
-          console.log(`Updated ${distributor.name}: Auxiliary = ${distributor.auxiliary}`);
+          console.log(
+            `Updated ${participant.name}: Auxiliary = ${participant.auxiliary}, Transaction Count = ${participant.trxCount}`
+          );
+          console.log(
+            `Updated ${distributor.name}: Auxiliary = ${distributor.auxiliary}`
+          );
 
           // Delete the link if it is fully utilized
           await LinkModel.deleteOne({ _id: link._id });
 
           // If the distributor is not the admin, decrement the trigger
-          if (!distributor._id.equals("669abda01a463bfc44b0b5a7")) { // Admin ID
+          if (!distributor._id.equals("669abda01a463bfc44b0b5a7")) {
+            // Admin ID
             distributor.trigger -= 1;
             await distributor.save();
-            console.log(`Updated ${distributor.name}: Trigger = ${distributor.trigger}`);
+            console.log(
+              `Updated ${distributor.name}: Trigger = ${distributor.trigger}`
+            );
           }
 
           // Recalculate the public rate for the participant
@@ -335,8 +361,12 @@ transactionCtrl.createDistributionTransaction = async (distributor, participant,
           await participant.save();
           await distributor.save();
 
-          console.log(`Updated ${participant.name}: Auxiliary = ${participant.auxiliary}, Transaction Count = ${participant.trxCount}`);
-          console.log(`Updated ${distributor.name}: Auxiliary = ${distributor.auxiliary}`);
+          console.log(
+            `Updated ${participant.name}: Auxiliary = ${participant.auxiliary}, Transaction Count = ${participant.trxCount}`
+          );
+          console.log(
+            `Updated ${distributor.name}: Auxiliary = ${distributor.auxiliary}`
+          );
 
           // Update the link with reduced amount and rate set to 0
           await LinkModel.updateOne(
@@ -344,21 +374,47 @@ transactionCtrl.createDistributionTransaction = async (distributor, participant,
             { $inc: { amount: -share }, $set: { feeRate: 0 } }
           );
 
-          console.log(`Updated link between ${participant.name} and ${distributor.name}: Remaining Amount = ${link.amount - share}`);
+          console.log(
+            `Updated link between ${participant.name} and ${
+              distributor.name
+            }: Remaining Amount = ${link.amount - share}`
+          );
         }
       } else {
-        console.log(`No link found between ${participant.name} and ${distributor.name}`);
+        console.log(
+          `No link found between ${participant.name} and ${distributor.name}`
+        );
       }
     }
   } catch (error) {
-    console.error('Error creating distribution transaction:', error.message);
+    console.error("Error creating distribution transaction:", error.message);
   }
+};
+3;
+// Calculate value for a user
+transactionCtrl.calculateValue = async (user) => {
+  const linkObligation = await LinkModel.aggregate([
+    { $match: { senderId: user._id } },
+    { $group: { _id: null, total: { $sum: "$amount" } } },
+  ]);
+
+  const linkIncome = await LinkModel.aggregate([
+    { $match: { receiverId: user._id } },
+    { $group: { _id: null, total: { $sum: "$amount" } } },
+  ]);
+
+  const totalObligation = linkObligation[0]?.total || 0;
+  const totalIncome = linkIncome[0]?.total || 0;
+
+  return user.balance + user.auxiliary + totalObligation - totalIncome;
 };
 
 // Get all transactions
 transactionCtrl.getAllTransactions = async (req, res) => {
   try {
-    const transactions = await TransactionModel.find().populate('senderId receiverId');
+    const transactions = await TransactionModel.find().populate(
+      "senderId receiverId"
+    );
     return response(res, 200, true, transactions, "List of all transactions");
   } catch (error) {
     console.error(`Error retrieving transactions: ${error.message}`);
