@@ -260,10 +260,7 @@ transactionCtrl.Distribute = async (user) => {
 
     // Calculate and distribute shares for each participant
     for (const participant of participants) {
-      const pr = participant.public_rate > 0 ? participant.public_rate : 10; // Assuming a minimum PR of 10
-
-      const share = distributionAmount * (pr / totalPR);
-      console.log('Share for', participant.name, ':', share);
+      const share = distributionAmount * participant.public_rate / totalPR;
 
       if (share > 0) {
         console.log(share, 'goes to', participant.name);
@@ -279,40 +276,41 @@ transactionCtrl.Distribute = async (user) => {
   }
 };
 
+
 // Create a distribution transaction
-transactionCtrl.createDistributionTransaction = async (distributor, recipient, share) => {
-  try {
-    // Update balances of distributor and recipient
-    distributor.balance -= share;
-    recipient.balance += share;
+// transactionCtrl.createDistributionTransaction = async (distributor, recipient, share) => {
+//   try {
+//     // Update balances of distributor and recipient
+//     distributor.balance -= share;
+//     recipient.balance += share;
 
-    // Save updated balances
-    await distributor.save();
-    await recipient.save();
+//     // Save updated balances
+//     await distributor.save();
+//     await recipient.save();
 
-    // Create and save the distribution transaction record
-    const transaction = await TransactionModel.create({
-      senderName: distributor.name,
-      receiverName: recipient.name,
-      senderId: distributor._id,
-      receiverId: recipient._id,
-      amount: share,
-      fee_rate: 0,  // No fee for distribution transactions
-      initialSenderBalance: distributor.balance + share,
-      finalSenderBalance: distributor.balance,
-    });
+//     // Create and save the distribution transaction record
+//     const transaction = await TransactionModel.create({
+//       senderName: distributor.name,
+//       receiverName: recipient.name,
+//       senderId: distributor._id,
+//       receiverId: recipient._id,
+//       amount: share,
+//       fee_rate: 0,  // No fee for distribution transactions
+//       initialSenderBalance: distributor.balance + share,
+//       finalSenderBalance: distributor.balance,
+//     });
 
-    // Add transaction ID to transaction histories
-    distributor.transactionHistory.push(transaction._id);
-    recipient.transactionHistory.push(transaction._id);
-    await distributor.save();
-    await recipient.save();
+//     // Add transaction ID to transaction histories
+//     distributor.transactionHistory.push(transaction._id);
+//     recipient.transactionHistory.push(transaction._id);
+//     await distributor.save();
+//     await recipient.save();
 
-    console.log('Distribution transaction created successfully:', transaction._id);
-  } catch (error) {
-    console.error('Error creating distribution transaction:', error.message);
-  }
-};
+//     console.log('Distribution transaction created successfully:', transaction._id);
+//   } catch (error) {
+//     console.error('Error creating distribution transaction:', error.message);
+//   }
+// };
 
 // Get all transactions
 transactionCtrl.getAllTransactions = async (req, res) => {
