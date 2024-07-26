@@ -16,34 +16,40 @@ const initializeUsers = async () => {
     await LinkModel.deleteMany({});
 
     // Update all users
-    await UserModel.updateMany({}, {
-      $set: {
-        balance: 1000,
-        value: 1000,
-        public_rate: 10,
-        link_obligation: 0,
-        link_income: 0,
-        auxiliary: 0,
-        trigger: 0,
-        trxCount: 0,
-        transactionHistory: [], // Clear transaction history
+    await UserModel.updateMany(
+      {},
+      {
+        $set: {
+          balance: 1000,
+          value: 1000,
+          public_rate: 10,
+          link_obligation: 0,
+          link_income: 0,
+          auxiliary: 0,
+          trigger: 0,
+          trxCount: 0,
+          transactionHistory: [], // Clear transaction history
+        },
       }
-    });
+    );
 
     // Update admin user separately
-    await UserModel.updateOne({ _id: "669abda01a463bfc44b0b5a7" }, {
-      $set: {
-        balance: 1000,
-        value: 1000,
-        public_rate: 10,
-        link_obligation: 0,
-        link_income: 0,
-        auxiliary: 0,
-        trigger: 2,
-        trxCount: 0,
-        transactionHistory: [], // Clear transaction history
+    await UserModel.updateOne(
+      { _id: "669abda01a463bfc44b0b5a7" },
+      {
+        $set: {
+          balance: 1000,
+          value: 1000,
+          public_rate: 10,
+          link_obligation: 0,
+          link_income: 0,
+          auxiliary: 0,
+          trigger: 2,
+          trxCount: 0,
+          transactionHistory: [], // Clear transaction history
+        },
       }
-    });
+    );
 
     console.log("Users initialized successfully.");
   } catch (error) {
@@ -211,14 +217,25 @@ transactionCtrl.calculatePR = async (user) => {
 
 // Clear pending distributions
 transactionCtrl.clearPendingDistributions = async () => {
-  const users = await UserModel.find({
-    trxCount: { $gte: { $add: ["$trigger", 1] } },
-  });
+  try {
+    const users = await UserModel.find({});
 
-  for (const user of users) {
-    await transactionCtrl.distribute(user);
+    // Log the users obtained from the query
+    console.log("All users:", users);
+
+    const usersWithPendingDistributions = users.filter(user => user.trxCount >= user.trigger + 1);
+
+    // Log the users that meet the condition
+    console.log("Users with pending distributions:", usersWithPendingDistributions);
+
+    for (const user of usersWithPendingDistributions) {
+      await transactionCtrl.distribute(user);
+    }
+  } catch (error) {
+    console.error(`Error clearing pending distributions: ${error.message}`);
   }
 };
+
 
 // Distribute function (to be implemented as needed)
 transactionCtrl.distribute = async (user) => {
