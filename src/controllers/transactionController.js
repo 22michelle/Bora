@@ -1,7 +1,7 @@
-import { response } from "../helpers/Response.js";
 import { UserModel } from "../models/userModel.js";
 import { TransactionModel } from "../models/transactionModel.js";
 import { LinkModel } from "../models/linkModel.js";
+import { response } from "../helpers/Response.js";
 import linkCtrl from "./linkController.js";
 
 const transactionCtrl = {};
@@ -63,12 +63,7 @@ initializeUsers();
 // Create Transaction
 transactionCtrl.createTransaction = async (req, res) => {
   try {
-    const {
-      senderAccountNumber,
-      receiverAccountNumber,
-      amount,
-      feeRate,
-    } = req.body;
+    const { senderAccountNumber, receiverAccountNumber, amount, feeRate } = req.body;
 
     // Validate required fields
     if (!senderAccountNumber || !receiverAccountNumber || !amount || !feeRate) {
@@ -229,45 +224,107 @@ transactionCtrl.clearPendingDistributions = async () => {
     console.log("Users with pending distributions:", usersWithPendingDistributions);
 
     for (const user of usersWithPendingDistributions) {
-      await transactionCtrl.distribute(user);
+      await transactionCtrl.Distribute(user);
     }
   } catch (error) {
     console.error(`Error clearing pending distributions: ${error.message}`);
   }
 };
 
-
 // Distribute function (to be implemented as needed)
-transactionCtrl.distribute = async (user) => {
-  // Implement your distribution logic here
-  console.log(`Distributing for user: ${user.name}`);
+transactionCtrl.Distribute = async (user) => {
+  try {
+    console.log(`Distributing for user: ${user.name}`);
+
+    const distributionAmount = user.auxiliary;
+    const initialLinkIncome = user.link_income;
+
+    // Get all participants (senders to the user and the user itself)
+    const senders = await LinkModel.find({
+      receiverId: user._id,
+    }).distinct('senderId');
+
+    // Log senders for debugging
+    console.log('Senders found:', senders.length);
+    senders.forEach(sender => console.log('Sender ID:', sender));
+
+    // List to hold actual participants
+    const actualParticipants = [];
+
+    for (const senderId of senders) {
+      const participant = await UserModel.findById(senderId);
+      if (participant && participant.balance < participant.value) {
+        actualParticipants.push(participant);
+        console.log('Eligible participant added:', participant._id, '-', participant.name);
+      } else {
+        console.log('Participant not eligible:', participant ? participant._id : 'Unknown', '-', participant ? participant.name : 'Unknown');
+      }
+    }
+
+    // Also consider the user itself as a potential participant
+    if (user.balance < user.value) {
+      actualParticipants.push(user);
+      console.log('User itself added as participant:', user._id, '-', user.name);
+    }
+
+    // Log actual participants for debugging
+    console.log('Total actual participants:', actualParticipants.length);
+    actualParticipants.forEach(participant => console.log('Participant ID:', participant._id, ', Public Rate:', participant.public_rate));
+
+    if (actualParticipants.length === 0) {
+      console.log('No eligible participants found for user:', user._id);
+      return;
+    }
+
+    // Collect IDs of actual participants
+    const participantIds = actualParticipants.map(participant => participant._id);
+    console.log('Participant IDs:', participantIds);
+
+    // Sum public rates of actual participants
+    const sumPublicRates = await UserModel.aggregate([
+      { $match: { _id: { $in: participantIds } } },
+      { $group: { _id: null, total: { $sum: "$public_rate" } } },
+    ]);
+
+    console.log('Sum of public rates:', sumPublicRates);
+
+    // Distribute amount based on public rates
+    const totalPublicRates = sumPublicRates[0]?.total || 0;
+    if (totalPublicRates === 0) {
+      console.log('Sum of public rates is zero for user:', user._id);
+      return;
+    }
+
+    for (const participant of actualParticipants) {
+      const distributionShare = distributionAmount * (participant.public_rate / totalPublicRates);
+
+      participant.link_income += distributionShare;
+      participant.balance += distributionShare;
+      await participant.save();
+
+      console.log('Distributed to participant:', participant._id, ', Amount:', distributionShare);
+    }
+
+    // Reset user auxiliary and link income
+    user.auxiliary = 0;
+    user.link_income = initialLinkIncome;
+    user.trxCount = 0;
+    await user.save();
+
+    console.log(`Distribution completed successfully for user: ${user.name}`);
+  } catch (error) {
+    console.error(`Error during distribution: ${error.message}`);
+  }
 };
 
-// Get All Transactions
+// Get all transactions
 transactionCtrl.getAllTransactions = async (req, res) => {
   try {
-    const transactions = await TransactionModel.find()
-      .sort({ createdAt: 1 })
-      .populate("senderId receiverId", "name accountNumber");
-
-    const userDataPromises = transactions.map(async (transaction) => {
-      const sender = await UserModel.findById(transaction.senderId);
-      const receiver = await UserModel.findById(transaction.receiverId);
-      return { sender, receiver, transaction };
-    });
-
-    const userData = await Promise.all(userDataPromises);
-
-    return response(
-      res,
-      200,
-      true,
-      userData,
-      "Transactions obtained successfully"
-    );
+    const transactions = await TransactionModel.find().populate('senderId receiverId');
+    return response(res, 200, true, transactions, "List of all transactions");
   } catch (error) {
-    console.error(`Error fetching transactions: ${error.message}`);
-    return response(res, 500, false, null, error.message);
+    console.error(`Error retrieving transactions: ${error.message}`);
+    return response(res, 500, false, "", "Error retrieving transactions");
   }
 };
 
