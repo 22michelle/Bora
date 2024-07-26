@@ -261,11 +261,10 @@ transactionCtrl.Distribute = async (user) => {
     // Calculate and distribute shares for each participant
     for (const participant of participants) {
       const share = distributionAmount * participant.public_rate / totalPR;
-
-      if (share > 0) {
-        console.log(share, 'goes to', participant.name);
-        await transactionCtrl.createDistributionTransaction(user, participant, share);
-      }
+      
+      // Log the share distribution and create the transaction
+      console.log(`${user.name}, to ${participant.name}, ${share}`);
+      await transactionCtrl.createDistributionTransaction(user, participant, share);
     }
 
     // Reset transaction count (trxCount) to zero after distribution
@@ -277,40 +276,18 @@ transactionCtrl.Distribute = async (user) => {
 };
 
 
-// Create a distribution transaction
-// transactionCtrl.createDistributionTransaction = async (distributor, recipient, share) => {
-//   try {
-//     // Update balances of distributor and recipient
-//     distributor.balance -= share;
-//     recipient.balance += share;
-
-//     // Save updated balances
-//     await distributor.save();
-//     await recipient.save();
-
-//     // Create and save the distribution transaction record
-//     const transaction = await TransactionModel.create({
-//       senderName: distributor.name,
-//       receiverName: recipient.name,
-//       senderId: distributor._id,
-//       receiverId: recipient._id,
-//       amount: share,
-//       fee_rate: 0,  // No fee for distribution transactions
-//       initialSenderBalance: distributor.balance + share,
-//       finalSenderBalance: distributor.balance,
-//     });
-
-//     // Add transaction ID to transaction histories
-//     distributor.transactionHistory.push(transaction._id);
-//     recipient.transactionHistory.push(transaction._id);
-//     await distributor.save();
-//     await recipient.save();
-
-//     console.log('Distribution transaction created successfully:', transaction._id);
-//   } catch (error) {
-//     console.error('Error creating distribution transaction:', error.message);
-//   }
-// };
+// Create a distribution transaction (test function)
+transactionCtrl.createDistributionTransaction = async (distributor, recipient, share) => {
+  try {
+    // Log the details of the distribution transaction
+    console.log(`${distributor.name}, to ${recipient.name}, ${share}`);
+    
+    // Simulate a successful operation for testing
+    console.log('Distribution transaction created successfully (test function).');
+  } catch (error) {
+    console.error('Error creating distribution transaction:', error.message);
+  }
+};
 
 // Get all transactions
 transactionCtrl.getAllTransactions = async (req, res) => {
