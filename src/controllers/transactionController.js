@@ -275,15 +275,81 @@ transactionCtrl.Distribute = async (user) => {
   }
 };
 
-
-// Create a distribution transaction (test function)
-transactionCtrl.createDistributionTransaction = async (distributor, recipient, share) => {
+// Create a distribution transaction
+transactionCtrl.createDistributionTransaction = async (distributor, participant, share) => {
   try {
-    // Log the details of the distribution transaction
-    console.log(`${distributor.name}, to ${recipient.name}, ${share}`);
-    
-    // Simulate a successful operation for testing
-    console.log('Distribution transaction created successfully (test function).');
+    // Check if the distributor and participant are the same
+    if (distributor._id.equals(participant._id)) {
+      // If the distributor is the same as the participant
+      participant.balance += share;
+      participant.auxiliary -= share;
+
+      // Save the participant's updated details
+      await participant.save();
+
+      console.log(`Updated ${participant.name}: Balance = ${participant.balance}, Auxiliary = ${participant.auxiliary}`);
+    } else {
+      // Get the link value (assuming a link exists between participant and distributor)
+      const link = await LinkModel.findOne({
+        senderId: participant._id,
+        receiverId: distributor._id
+      });
+
+      // Check if the link exists and get its value
+      if (link) {
+        let linkValue = link.amount;
+
+        if (share > linkValue) {
+          // Adjust share if it exceeds the link value
+          share = linkValue;
+          participant.auxiliary += share;
+          participant.trxCount += 1;
+          distributor.auxiliary -= share;
+
+          // Save updated participant and distributor details
+          await participant.save();
+          await distributor.save();
+
+          console.log(`Updated ${participant.name}: Auxiliary = ${participant.auxiliary}, Transaction Count = ${participant.trxCount}`);
+          console.log(`Updated ${distributor.name}: Auxiliary = ${distributor.auxiliary}`);
+
+          // Delete the link if it is fully utilized
+          await LinkModel.deleteOne({ _id: link._id });
+
+          // If the distributor is not the admin, decrement the trigger
+          if (!distributor._id.equals("669abda01a463bfc44b0b5a7")) { // Admin ID
+            distributor.trigger -= 1;
+            await distributor.save();
+            console.log(`Updated ${distributor.name}: Trigger = ${distributor.trigger}`);
+          }
+
+          // Recalculate the public rate for the participant
+          await transactionCtrl.calculatePR(participant);
+        } else {
+          // Update link if share is less than the link value
+          participant.auxiliary += share;
+          participant.trxCount += 1;
+          distributor.auxiliary -= share;
+
+          // Save updated participant and distributor details
+          await participant.save();
+          await distributor.save();
+
+          console.log(`Updated ${participant.name}: Auxiliary = ${participant.auxiliary}, Transaction Count = ${participant.trxCount}`);
+          console.log(`Updated ${distributor.name}: Auxiliary = ${distributor.auxiliary}`);
+
+          // Update the link with reduced amount and rate set to 0
+          await LinkModel.updateOne(
+            { _id: link._id },
+            { $inc: { amount: -share }, $set: { feeRate: 0 } }
+          );
+
+          console.log(`Updated link between ${participant.name} and ${distributor.name}: Remaining Amount = ${link.amount - share}`);
+        }
+      } else {
+        console.log(`No link found between ${participant.name} and ${distributor.name}`);
+      }
+    }
   } catch (error) {
     console.error('Error creating distribution transaction:', error.message);
   }
