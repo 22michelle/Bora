@@ -8,9 +8,50 @@ const transactionCtrl = {};
 
 // Initialize users
 const initializeUsers = async () => {
-  await UserModel.updateMany({}, { $set: { public_rate: 10 } });
-  await UserModel.updateOne({ _id: "669abda01a463bfc44b0b5a7" }, { $set: { trigger: 3 } });
+  try {
+    // Delete all transactions
+    await TransactionModel.deleteMany({});
+
+    // Delete all links
+    await LinkModel.deleteMany({});
+
+    // Update all users
+    await UserModel.updateMany({}, {
+      $set: {
+        balance: 1000,
+        value: 1000,
+        public_rate: 10,
+        link_obligation: 0,
+        link_income: 0,
+        auxiliary: 0,
+        trigger: 0,
+        trxCount: 0,
+        transactionHistory: [], // Clear transaction history
+      }
+    });
+
+    // Update admin user separately
+    await UserModel.updateOne({ _id: "669abda01a463bfc44b0b5a7" }, {
+      $set: {
+        balance: 1000,
+        value: 1000,
+        public_rate: 10,
+        link_obligation: 0,
+        link_income: 0,
+        auxiliary: 0,
+        trigger: 2,
+        trxCount: 0,
+        transactionHistory: [], // Clear transaction history
+      }
+    });
+
+    console.log("Users initialized successfully.");
+  } catch (error) {
+    console.error(`Error initializing users: ${error.message}`);
+  }
 };
+
+// Call initializeUsers to set initial values
 initializeUsers();
 
 // Create Transaction
@@ -106,6 +147,9 @@ transactionCtrl.createTransaction = async (req, res) => {
     receiver.transactionHistory.push(transaction._id);
     await receiver.save();
 
+    // Clear pending distributions if necessary
+    await transactionCtrl.clearPendingDistributions();
+
     // Return success response
     return response(
       res,
@@ -147,7 +191,12 @@ transactionCtrl.calculatePR = async (user) => {
 
   const sumProd = await LinkModel.aggregate([
     { $match: { senderId: user._id } },
-    { $group: { _id: null, total: { $sum: { $multiply: ["$amount", "$feeRate"] } } } },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: { $multiply: ["$amount", "$feeRate"] } },
+      },
+    },
   ]);
 
   const totalAmountValue = totalAmount[0]?.total || 0;
@@ -158,6 +207,23 @@ transactionCtrl.calculatePR = async (user) => {
   } else {
     return sumProdValue / totalAmountValue;
   }
+};
+
+// Clear pending distributions
+transactionCtrl.clearPendingDistributions = async () => {
+  const users = await UserModel.find({
+    trxCount: { $gte: { $add: ["$trigger", 1] } },
+  });
+
+  for (const user of users) {
+    await transactionCtrl.distribute(user);
+  }
+};
+
+// Distribute function (to be implemented as needed)
+transactionCtrl.distribute = async (user) => {
+  // Implement your distribution logic here
+  console.log(`Distributing for user: ${user.name}`);
 };
 
 // Get All Transactions
