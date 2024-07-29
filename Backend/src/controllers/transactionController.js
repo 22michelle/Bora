@@ -35,7 +35,7 @@ const initializeUsers = async () => {
 
     // Update admin user separately
     await UserModel.updateOne(
-      { _id: "669abda01a463bfc44b0b5a7" },
+      { _id: "66a69d8fc52643ad71a3785a" },
       {
         $set: {
           balance: 1000,

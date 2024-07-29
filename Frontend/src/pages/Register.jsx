@@ -167,7 +167,7 @@ export default function Register() {
           </div>
 
           {/* Submit button */}
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <button type="submit" size="lg" className="btn btn-primary" disabled={loading}>
             {loading ? (
               <div className="d-flex align-items-center">
                 <Spinner animation="border" size="sm" />
@@ -180,7 +180,10 @@ export default function Register() {
           {/* Already have an account */}
           <div className="mt-3 text-center">
             <p className="fw-bold">
-              Already have an account? <a href="/login">Sign in</a>
+              Already have an account?{" "}
+              <a className="a" href="/login">
+                Login
+              </a>
             </p>
           </div>
         </form>

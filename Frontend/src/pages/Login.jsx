@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { Spinner } from "react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelope, faLock, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faEnvelope, faLock } from "@fortawesome/free-solid-svg-icons";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Function to validate the form data
+  // Function to validate the login form
   const validateForm = () => {
     const newErrors = {};
 
@@ -41,7 +41,6 @@ export default function Login() {
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      // Display toast notifications for validation errors
       for (const [key, message] of Object.entries(validationErrors)) {
         toast.error(message);
       }
@@ -51,12 +50,10 @@ export default function Login() {
     setLoading(true);
     setErrors({});
 
-    const { email, password } = data;
-
     try {
       const response = await axios.post(
         "http://localhost:4000/user/login",
-        { email, password },
+        data,
         {
           withCredentials: true,
           headers: {
@@ -70,7 +67,7 @@ export default function Login() {
       if (!responseData.ok) {
         toast.error(responseData.message || "Login Failed");
       } else {
-        localStorage.setItem("token", responseData.token); // Save token if needed
+        localStorage.setItem("token", responseData.token); // Save token
         toast.success(
           responseData.message || "Login Successful, Welcome To Bora"
         );
@@ -78,13 +75,11 @@ export default function Login() {
       }
     } catch (error) {
       console.error(error.response ? error.response.data : error.message);
-      if (error.response && error.response.data) {
-        toast.error(
-          error.response.data.message || "An unexpected error occurred"
-        );
-      } else {
-        toast.error("An unexpected error occurred");
-      }
+      toast.error(
+        error.response
+          ? error.response.data.message || "An unexpected error occurred"
+          : "An unexpected error occurred"
+      );
     } finally {
       setLoading(false);
     }
@@ -115,7 +110,6 @@ export default function Login() {
           {/* Password input */}
           <div className="form-group">
             <label htmlFor="password">
-              {" "}
               <FontAwesomeIcon icon={faLock} />
               Password
             </label>
@@ -131,7 +125,7 @@ export default function Login() {
           </div>
 
           {/* Submit button */}
-          <button type="submit" disabled={loading} className="btn btn-primary">
+          <button type="submit" disabled={loading} size="lg" className="btn-primary">
             {loading ? (
               <div className="d-flex align-items-center">
                 <Spinner animation="border" size="sm" />
@@ -145,7 +139,10 @@ export default function Login() {
           {/* Link to registration page */}
           <div className="mt-3 text-center">
             <p className="fw-bold">
-              Don't have an account? <a href="/register">Sign up</a>
+              Don't have an account?{" "}
+              <a className="a" href="/register">
+                Sign up
+              </a>
             </p>
           </div>
         </form>

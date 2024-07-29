@@ -33,6 +33,26 @@ h1 {
   font-size: 2rem;
   font-weight: bold;
 }
+.a {
+  text-align: center;
+  margin-bottom: 1rem;
+  color: #000;
+  font-weight: bold;
+}
+
+.explore {
+  padding: 10px 20px;
+  font-size: 1.1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  background-color: white;
+  color: black;
+}
+
+.explore:hover {
+  background-color: #ffffffc8;
+  color: #000;
+}
 
 /* Form Label Styles */
 .form-label {
@@ -87,16 +107,18 @@ h1 {
 .btn-primary {
   background-color: #000000;
   color: white;
-  border: none;
   padding: 15px;
   border-radius: 0.25rem;
   font-size: 1rem;
   cursor: pointer;
   transition: background-color 0.3s ease;
+  border: 1px solid #000000;
 }
 
 .btn-primary:hover {
-  background-color: #000000f1;
+  background-color: #ffffff;
+  color: #000;
+  border: 1px solid #000000;
 }
 
 /* Spinner Overlay Styles */

@@ -1,18 +1,37 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Spinner } from 'react-bootstrap';
+import { Spinner } from "react-bootstrap";
 
 export default function Dashboard() {
-  const [userData, setUserData] = useState(null);
+  const [userData, setUserData] = useState(null); // Inicializa userData como null
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
+      const token = localStorage.getItem("token");
+      console.log("Token retrieved from localStorage:", token); // Verifica que el token sea correcto
+
+      if (!token) {
+        toast.error("No token found, please log in again.");
+        setLoading(false);
+        return;
+      }
+
       try {
-        const response = await axios.get("http://localhost:4000/user/:userId", {
-          withCredentials: true,
-        });
+        const response = await axios.get(
+          `http://localhost:4000/user/token/${token}`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            withCredentials: true,
+          }
+        );
+
+        console.log("Response from server:", response.data);
 
         if (response.data.ok) {
           setUserData(response.data.data);
@@ -20,8 +39,15 @@ export default function Dashboard() {
           toast.error(response.data.message || "Failed to fetch user data");
         }
       } catch (error) {
-        console.error(error.response ? error.response.data : error.message);
-        toast.error(error.response ? error.response.data.message : "An unexpected error occurred");
+        console.error(
+          "Error fetching user data:",
+          error.response ? error.response.data : error.message
+        );
+        toast.error(
+          error.response
+            ? error.response.data.message
+            : "An unexpected error occurred"
+        );
       } finally {
         setLoading(false);
       }

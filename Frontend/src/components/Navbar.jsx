@@ -11,7 +11,7 @@ export default function Navbar() {
             src="../../src/assets/Logo2.png"
             alt="Bora"
             className="navbar-logo-img"
-          />
+          /> <h2 className="mt-2">Bora</h2>
         </Link>
         <button
           className="navbar-toggler"
