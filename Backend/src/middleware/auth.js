@@ -7,29 +7,25 @@ const messageNoAuth = (res) => {
 };
 
 export const verifyToken = async (req, res, next) => {
-  let token = null;
+  const authHeader = req.headers.authorization;
+  
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    token = req.headers.authorization.split(" ")[1];
-
-    jwt.verify(token, process.env.KEYWORD_TOKEN, async (err, payload) => {
-      if (err) {
-        return messageNoAuth(res);
-      }
-
-      const user = await UserModel.findById(payload.user);
+    try {
+      const decoded = jwt.verify(token, process.env.KEYWORD_TOKEN);
+      const user = await UserModel.findById(decoded.user);
 
       if (!user) {
         return messageNoAuth(res);
       }
 
-      req.userId = payload.user;
+      req.userId = decoded.user;
       next();
-    });
+    } catch (error) {
+      return messageNoAuth(res);
+    }
   } else {
-    next();
+    response(res, 401, false, "", "Authorization header is missing or invalid");
   }
 };

@@ -1,40 +1,43 @@
 import { response } from "../helpers/Response.js";
 import { UserModel } from "../models/userModel.js";
-import { TransactionModel } from "../models/transactionModel.js";
-import bcrypt from "bcrypt";
 import { generateToken } from "../helpers/generateToken.js";
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import { encryptPassword } from "../helpers/encryptPassword.js";
 
 const userCtrl = {};
-
-// User Profile
-userCtrl.getUserProfile = async (req, res) => {
-  try {
-    const user = await UserModel.findById(req.userId).select("-password");
-    if (!user) {
-      return res.status(404).json({ ok: false, data: null, message: "User not found" });
-    }
-    res.status(200).json({ ok: true, data: user, message: "User profile retrieved successfully" });
-  } catch (error) {
-    console.error("Error retrieving user profile:", error);
-    res.status(500).json({ ok: false, data: null, message: "Server error" });
-  }
-};
 
 // Create User
 userCtrl.register = async (req, res) => {
   try {
     const { name, email, password, confirmPassword } = req.body;
 
+    const exist = await UserModel.findOne({ email });
+
+    if (exist) {
+      return response(res, 400, false, null, "Email is already in use");
+    }
+
     if (password !== confirmPassword) {
       return response(res, 400, false, null, "Passwords do not match");
     }
 
+    if (password.length < 6) {
+      return response(
+        res,
+        400,
+        false,
+        null,
+        "Password must be at least 6 characters long"
+      );
+    }
+
+    // const hashedPassword = encryptPassword(password);
     const newUser = new UserModel({ name, email, password });
     await newUser.save();
 
-    const token = newUser.generateAuthToken(); // Generate token with userId
+    const token = generateToken({ user: newUser._id }); // Generar token con userId
     response(
       res,
       201,
@@ -54,18 +57,37 @@ userCtrl.login = async (req, res) => {
     const user = await UserModel.findOne({ email });
 
     if (user && bcrypt.compareSync(password, user.password)) {
-      // Generate token with user ID
-      const token = user.generateAuthToken();
+      const token = generateToken({ user: user._id });
       return response(
         res,
         200,
         true,
-        { ...user.toJSON(), password: null, token },
+        { ...user.toJSON(), token },
         "Welcome to Bora"
       );
     }
 
     response(res, 400, false, "", "Incorrect Email or Password");
+  } catch (error) {
+    response(res, 500, false, null, error.message);
+  }
+};
+
+// Get User by Id
+userCtrl.getUserById = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return response(res, 400, false, null, "Invalid User ID");
+    }
+
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      return response(res, 404, false, "", "User not found");
+    }
+
+    response(res, 200, true, { ...user._doc, password: null }, "User found");
   } catch (error) {
     response(res, 500, false, null, error.message);
   }
@@ -154,28 +176,9 @@ userCtrl.getUserByToken = async (req, res) => {
   } catch (error) {
     if (error.name === "TokenExpiredError") {
       response(res, 401, false, null, "The token has expired");
+    } else {
+      response(res, 500, false, null, error.message);
     }
-    response(res, 500, false, null, error.message);
-  }
-};
-
-// Get User by Id
-userCtrl.getUserById = async (req, res) => {
-  try {
-    const userId = req.params.userId;
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return response(res, 400, false, null, "Invalid User ID");
-    }
-
-    const user = await UserModel.findById(userId);
-    if (!user) {
-      return response(res, 404, false, "", "User not found");
-    }
-
-    response(res, 200, true, { ...user._doc, password: null }, "User found");
-  } catch (error) {
-    response(res, 500, false, null, error.message);
   }
 };
 

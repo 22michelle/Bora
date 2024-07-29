@@ -340,7 +340,7 @@ transactionCtrl.clearteDistributionTransaction = async (
           await LinkModel.deleteOne({ _id: link._id });
 
           // If the distributor is not the admin, decrement the trigger
-          if (!distributor._id.equals("669abda01a463bfc44b0b5a7")) {
+          if (!distributor._id.equals("66a69d8fc52643ad71a3785a")) {
             // Admin ID
             distributor.trigger -= 1;
             await distributor.save();

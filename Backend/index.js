@@ -8,10 +8,9 @@ import morgan from "morgan";
 import { connectDB } from "./database.js";
 
 // Routes
-import userRoutes from "./src/routes/user.routes.js"
-import transactionRoutes from "./src/routes/transaction.routes.js"
-import linkRoutes from "./src/routes/link.routes.js"
-
+import userRoutes from "./src/routes/user.routes.js";
+import transactionRoutes from "./src/routes/transaction.routes.js";
+import linkRoutes from "./src/routes/link.routes.js";
 
 connectDB();
 
@@ -19,7 +18,13 @@ const app = express();
 app.set("Port", 4000);
 
 app.use(morgan("dev"));
-app.use(cors({ origin: "*" }));
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 

@@ -1,42 +1,117 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* General Styles */
+body {
+  background-color: black;
+  color: white;
+  margin: 0;
+  padding: 0;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
- 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Container Styles */
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  padding: 5rem;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
+/* Card Styles */
 .card {
-  padding: 2em;
+  background-color: #ffffff;
+  padding: 2rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  width: 100%;
 }
 
-.read-the-docs {
+/* Heading Styles */
+h1 {
+  text-align: center;
+  margin-bottom: 1rem;
+  color: #000;
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+/* Form Label Styles */
+.form-label {
+  color: #863131;
+  font-weight: bold;
+}
+
+/* Form Group */
+.form-group {
+  margin-bottom: 1rem;
+  color: #000000;
+  font-weight: bold;
+}
+
+/* Form Control Styles */
+.form-control {
+  background-color: #f9f9f9;
+  border: 1px solid #000000;
+  color: #010101;
+  padding: 0.75rem;
+  border-radius: 0.25rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-control::placeholder {
   color: #888;
+}
+
+/* Invalid Input Styles */
+.form-control.is-invalid {
+  border-color: #dc3545;
+}
+
+.invalid-feedback {
+  color: #dc3545;
+  font-size: 0.875rem;
+}
+
+.error {
+  color: #dc3545;
+}
+
+/* Button Container Styles */
+.button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+/* Button Styles */
+.btn-primary {
+  background-color: #000000;
+  color: white;
+  border: none;
+  padding: 15px;
+  border-radius: 0.25rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.btn-primary:hover {
+  background-color: #000000f1;
+}
+
+/* Spinner Overlay Styles */
+.spinner-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.spinner-border {
+  border-top-color: white;
 }

@@ -8,7 +8,7 @@ const linkCtrl = {};
 linkCtrl.updateLink = async (data) => {
   try {
     const { senderId, receiverId, feeRate, amount, senderName, receiverName } = data;
-    const adminId = "669abda01a463bfc44b0b5a7";
+    const adminId = "66a69d8fc52643ad71a3785a";
 
     let link = await LinkModel.findOne({ senderId, receiverId });
 

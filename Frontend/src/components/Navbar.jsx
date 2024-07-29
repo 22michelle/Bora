@@ -1,15 +1,18 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
-import Login from '../pages/Login'
-import Register from '../pages/Register'
+import React from "react";
+import { Link } from "react-router-dom";
+import "../App.css"
 
 export default function Navbar() {
   return (
-   <nav>
-    <Link to="/">Home</Link>
-    <Link to="register">Register</Link>
-    <Link to="login">Login</Link>
-
-   </nav>
-  )
+    <nav className="navbar">
+      <div className="navbar-container">
+        <Link to="/" className="navbar-logo">Bora</Link>
+        <div className="navbar-links">
+          <Link to="/" className="navbar-link">Home</Link>
+          <Link to="/register" className="navbar-link">Register</Link>
+          <Link to="/login" className="navbar-link">Login</Link>
+        </div>
+      </div>
+    </nav>
+  );
 }
