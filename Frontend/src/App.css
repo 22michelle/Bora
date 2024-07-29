@@ -11,7 +11,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  height: 50%;
   padding: 5rem;
 }
 
@@ -114,4 +114,45 @@ h1 {
 
 .spinner-border {
   border-top-color: white;
+}
+
+/* Navbar */
+.navbar {
+  background-color: #ffffff; /* Fondo blanco */
+  padding: 2px; /* Padding alrededor del navbar */
+}
+
+/* Logo del Navbar */
+.navbar-brand {
+  display: flex;
+  align-items: center;
+}
+
+.navbar-logo-img {
+  max-height: 50px;
+  width: auto;
+}
+
+/* Enlaces del Navbar */
+.navbar-nav {
+  margin-left: auto;
+}
+
+/* Enlace del Navbar */
+.nav-link {
+  color: #000000;
+  text-decoration: none;
+  font-size: 1rem;
+  transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+  background-color: #000;
+  color: #ffffff;
+  padding: 0.7rem;
+  border-radius: 5px;
+}
+
+.nav-link.active {
+  font-weight: bold; /* Enlace activo en negrita */
 }

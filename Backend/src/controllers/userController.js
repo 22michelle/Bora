@@ -53,11 +53,12 @@ userCtrl.register = async (req, res) => {
 // Login
 userCtrl.login = async (req, res) => {
   try {
-    const { password, email } = req.body;
+    const { email, password } = req.body;
     const user = await UserModel.findOne({ email });
 
     if (user && bcrypt.compareSync(password, user.password)) {
       const token = generateToken({ user: user._id });
+
       return response(
         res,
         200,

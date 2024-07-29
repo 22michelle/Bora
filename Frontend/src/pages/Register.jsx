@@ -30,6 +30,8 @@ export default function Register() {
     }
 
     if (!data.password) newErrors.password = "Password is required";
+    if (!data.confirmPassword)
+      newErrors.confirmPassword = "Confirm Password is required";
     else if (data.password.length < 6)
       newErrors.password = "Password must be at least 6 characters long";
 
@@ -157,9 +159,7 @@ export default function Register() {
               onChange={(e) =>
                 setData({ ...data, confirmPassword: e.target.value })
               }
-              className={`form-control ${
-                errors.confirmPassword ? "is-invalid" : ""
-              }`}
+              className={`form-control ${errors.Password ? "is-invalid" : ""}`}
             />
             {errors.confirmPassword && (
               <p className="error">{errors.confirmPassword}</p>
@@ -177,8 +177,8 @@ export default function Register() {
               "Sign Up"
             )}
           </button>
-           {/* Already have an account */}
-           <div className="mt-3 text-center">
+          {/* Already have an account */}
+          <div className="mt-3 text-center">
             <p className="fw-bold">
               Already have an account? <a href="/login">Sign in</a>
             </p>
