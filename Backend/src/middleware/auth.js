@@ -2,26 +2,34 @@ import jwt from "jsonwebtoken";
 import { response } from "../helpers/Response.js";
 import { UserModel } from "../models/userModel.js";
 
+const messageNoAuth = (res) => {
+  response(res, 401, false, "", "No estás autorizado para ingresar");
+};
+
 export const verifyToken = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
+  let token = null;
 
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.split(" ")[1];
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    token = req.headers.authorization.split(" ")[1];
 
-    try {
-      const decoded = jwt.verify(token, process.env.KEYWORD_TOKEN);
-      const user = await UserModel.findById(decoded.user);
-
-      if (!user) {
-        return response(res, 401, false, "", "You are not authorized to enter");
+    jwt.verify(token, process.env.KEYWORD_TOKEN, async (err, payload) => {
+      if (err) {
+        return messageNoAuth(res);
       }
 
-      req.userId = decoded.user;
+      const user = await UserModel.findById(payload.user);
+
+      if (!user) {
+        return messageNoAuth(res);
+      }
+
+      req.userId = payload.user;
       next();
-    } catch (error) {
-      return response(res, 401, false, "", "You are not authorized to enter");
-    }
+    });
   } else {
-    return response(res, 401, false, "", "Authorization header is missing or invalid");
+    next();
   }
 };

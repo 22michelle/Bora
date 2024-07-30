@@ -35,7 +35,7 @@ const initializeUsers = async () => {
 
     // Update admin user separately
     await UserModel.updateOne(
-      { _id: "66a69d8fc52643ad71a3785a" },
+      { _id: "66a8ff7bc992db5aa2ddf33f" },
       {
         $set: {
           balance: 1000,
@@ -119,7 +119,7 @@ transactionCtrl.createTransaction = async (req, res) => {
       });
 
       // Update receiver-admin link
-      const adminId = "669abda01a463bfc44b0b5a7";
+      const adminId = "66a8ff7bc992db5aa2ddf33f";
       const admin = await UserModel.findById(adminId);
       if (admin) {
         await linkCtrl.updateLink({

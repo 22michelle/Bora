@@ -6,6 +6,6 @@ export const encryptPassword = (password) => {
     const passwordEncrypted = bcrypt.hashSync(password, salt);
     return passwordEncrypted;
   } catch (error) {
-    console.log("Error encrypting password", error.message);
+    console.log("Error al encriptar la constraseña", error.message);
   }
-};
+}; 

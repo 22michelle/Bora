@@ -1,0 +1,86 @@
+body {
+  background-color: black;
+  color: white;
+  margin: 0;
+  padding: 0;
+}
+
+.dashboard-container {
+  padding: 20px;
+  margin-top: 65px;
+  color: black;
+}
+
+.dashboard-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.dashboard-card {
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.balance-section {
+  margin-bottom: 20px;
+}
+
+.balance-section h3 {
+  margin: 0;
+}
+
+.balance-section p {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.info-section {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.info-column {
+  flex: 1;
+  padding: 0 10px;
+}
+
+.info-column p {
+  font-size: 1.2rem;
+  padding: -50px;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+}
+
+.transactions-heading {
+  margin-top: 30px;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  text-align: start;
+  color: white;
+}
+
+.transactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-height: 60px;
+  text-align: start;
+}
+
+.transaction-card {
+  background-color: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
