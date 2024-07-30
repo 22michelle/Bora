@@ -61,7 +61,7 @@ export default function Register() {
 
     try {
       const response = await axios.post(
-        "http://localhost:4000/user/register",
+        "https://backend-bora.onrender.com/user/register", // URL actualizada
         { name, email, password, confirmPassword },
         {
           withCredentials: true,
@@ -159,7 +159,7 @@ export default function Register() {
               onChange={(e) =>
                 setData({ ...data, confirmPassword: e.target.value })
               }
-              className={`form-control ${errors.Password ? "is-invalid" : ""}`}
+              className={`form-control ${errors.confirmPassword ? "is-invalid" : ""}`}
             />
             {errors.confirmPassword && (
               <p className="error">{errors.confirmPassword}</p>
@@ -177,6 +177,7 @@ export default function Register() {
               "Sign Up"
             )}
           </button>
+
           {/* Already have an account */}
           <div className="mt-3 text-center">
             <p className="fw-bold">

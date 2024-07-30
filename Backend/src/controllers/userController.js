@@ -133,20 +133,17 @@ userCtrl.getUserByToken = async (req, res) => {
     const decoded = jwt.verify(token, process.env.KEYWORD_TOKEN);
     const userId = decoded.user;
 
-    const user = await UserModel.findById(userId);
+    const user = await UserModel.findById(userId).select("-password");
 
     if (!user) {
       return response(res, 404, false, "", "User not found");
     }
 
-    response(
-      res,
-      200,
-      true,
-      { ...user._doc, password: null, token },
-      "User found"
-    );
+    response(res, 200, true, { ...user._doc, token }, "User found");
   } catch (error) {
+    if (error.name === "JsonWebTokenError") {
+      return response(res, 401, false, "", "Invalid token");
+    }
     if (error.name === "TokenExpiredError") {
       response(res, 401, false, null, "The token has expired");
     }

@@ -58,7 +58,7 @@ const initializeUsers = async () => {
 };
 
 // Call initializeUsers to set initial values
-initializeUsers();
+// initializeUsers();
 
 // Create Transaction
 transactionCtrl.createTransaction = async (req, res) => {

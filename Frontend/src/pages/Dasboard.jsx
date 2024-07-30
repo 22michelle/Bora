@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { Spinner, Button } from "react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faHands } from "@fortawesome/free-solid-svg-icons";
-import { fakeUserData, fakeTransactions } from "./data";
+import axios from "axios";
 import "./styles.css";
 
 export default function Dashboard() {
@@ -11,14 +11,26 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
 
+  // Obtén el ID del usuario desde algún lugar (por ejemplo, desde el estado global o localStorage)
+  const userId = "user-id"; // Cambia esto por el método adecuado para obtener el ID del usuario
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
 
       try {
-        // Usa datos ficticios en lugar de una llamada a la API
-        setUserData(fakeUserData);
-        setTransactions(fakeTransactions);
+        // Realiza una llamada a la API para obtener los datos del usuario
+        const userResponse = await axios.get(`https://backend-bora.onrender.com/user/${userId}`, {
+          withCredentials: true,
+        });
+        setUserData(userResponse.data);
+
+        // Realiza una llamada a la API para obtener las transacciones
+        const transactionsResponse = await axios.get("https://backend-bora.onrender.com/transaction", {
+          withCredentials: true,
+        });
+        setTransactions(transactionsResponse.data);
+
       } catch (error) {
         toast.error("An unexpected error occurred");
       } finally {
@@ -27,7 +39,7 @@ export default function Dashboard() {
     };
 
     fetchData();
-  }, []);
+  }, [userId]);
 
   return (
     <div className="dashboard-container">
@@ -40,8 +52,8 @@ export default function Dashboard() {
         <div className="dashboard-content">
           <div className="dashboard-card">
             <h1>
-              Welcome, {userData.name}!!
-              <FontAwesomeIcon icon={faHands} />
+              Welcome, {userData.name}!
+              <FontAwesomeIcon icon={faHands} className="ms-2" />
             </h1>
             <div className="balance-section">
               <h3>Balance</h3>
@@ -68,26 +80,30 @@ export default function Dashboard() {
 
           <h3 className="transactions-heading">Transactions History</h3>
           <div className="transactions-list">
-            {transactions.map((transaction) => (
-              <div className="transaction-card" key={transaction._id}>
-                <p>
-                  <strong>Sender:</strong> {transaction.senderName}
-                </p>
-                <p>
-                  <strong>Receiver:</strong> {transaction.receiverName}
-                </p>
-                <p>
-                  <strong>Amount:</strong> ${transaction.amount}
-                </p>
-                <p>
-                  <strong>Fee Rate:</strong> {transaction.fee_rate}%
-                </p>
-                <p>
-                  <strong>Date:</strong>{" "}
-                  {new Date(transaction.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-            ))}
+            {transactions.length > 0 ? (
+              transactions.map((transaction) => (
+                <div className="transaction-card" key={transaction._id}>
+                  <p>
+                    <strong>Sender:</strong> {transaction.senderName}
+                  </p>
+                  <p>
+                    <strong>Receiver:</strong> {transaction.receiverName}
+                  </p>
+                  <p>
+                    <strong>Amount:</strong> ${transaction.amount}
+                  </p>
+                  <p>
+                    <strong>Fee Rate:</strong> {transaction.fee_rate}%
+                  </p>
+                  <p>
+                    <strong>Date:</strong>{" "}
+                    {new Date(transaction.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p>No transactions available</p>
+            )}
           </div>
         </div>
       ) : (

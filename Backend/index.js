@@ -1,11 +1,6 @@
-import * as dotenv from "dotenv";
-dotenv.config();
-
 import express from "express";
 import cors from "cors";
-import mongoose from "mongoose";
 import morgan from "morgan";
-// import cookieParser from "cookie-parser";
 import { connectDB } from "./database.js";
 
 // Routes
@@ -16,7 +11,7 @@ import linkRoutes from "./src/routes/link.routes.js";
 connectDB();
 
 const app = express();
-app.set("Port", 4000);
+const port = process.env.PORT || 4000;
 
 app.use(morgan("dev"));
 app.use(
@@ -25,7 +20,6 @@ app.use(
     credentials: true,
   })
 );
-// app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -34,6 +28,11 @@ app.use("/user", userRoutes);
 app.use("/transaction", transactionRoutes);
 app.use("/link", linkRoutes);
 
-app.listen(app.get("Port"), () => {
-  console.log("Server listening on the port:", app.get("Port"));
+// Ruta raíz (opcional, solo para verificación)
+app.get("/", (req, res) => {
+  res.send("Backend is working!");
+});
+
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
 });

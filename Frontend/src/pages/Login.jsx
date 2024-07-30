@@ -50,9 +50,11 @@ export default function Login() {
     setLoading(true);
     setErrors({});
 
+    console.log("Data being sent:", data); // Verifica los datos
+
     try {
       const response = await axios.post(
-        "http://localhost:4000/user/login",
+        "https://backend-bora.onrender.com/user/login",
         data,
         {
           withCredentials: true,
@@ -64,17 +66,22 @@ export default function Login() {
 
       const responseData = response.data;
 
+      console.log("Response Data:", responseData); 
+
       if (!responseData.ok) {
         toast.error(responseData.message || "Login Failed");
       } else {
-        localStorage.setItem("token", responseData.token); // Save token
+        localStorage.setItem("token", responseData.token);
         toast.success(
           responseData.message || "Login Successful, Welcome To Bora"
         );
         navigate("/dashboard");
       }
     } catch (error) {
-      console.error(error.response ? error.response.data : error.message);
+      console.error(
+        "Error during login:",
+        error.response ? error.response.data : error.message
+      ); 
       toast.error(
         error.response
           ? error.response.data.message || "An unexpected error occurred"
@@ -125,7 +132,12 @@ export default function Login() {
           </div>
 
           {/* Submit button */}
-          <button type="submit" disabled={loading} size="lg" className="btn-primary">
+          <button
+            type="submit"
+            disabled={loading}
+            size="lg"
+            className="btn-primary"
+          >
             {loading ? (
               <div className="d-flex align-items-center">
                 <Spinner animation="border" size="sm" />
