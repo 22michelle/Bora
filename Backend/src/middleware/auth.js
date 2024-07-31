@@ -3,7 +3,7 @@ import { response } from "../helpers/Response.js";
 import { UserModel } from "../models/userModel.js";
 
 const messageNoAuth = (res) => {
-  response(res, 401, false, "", "No estás autorizado para ingresar");
+  response(res, 401, false, "", "Not authorized to enter");
 };
 
 export const verifyToken = async (req, res, next) => {

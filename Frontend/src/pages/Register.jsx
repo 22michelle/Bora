@@ -61,7 +61,7 @@ export default function Register() {
 
     try {
       const response = await axios.post(
-        "https://backend-bora.onrender.com/user/register", // URL actualizada
+        "https://backend-bora.onrender.com/user/register",
         { name, email, password, confirmPassword },
         {
           withCredentials: true,
@@ -159,7 +159,9 @@ export default function Register() {
               onChange={(e) =>
                 setData({ ...data, confirmPassword: e.target.value })
               }
-              className={`form-control ${errors.confirmPassword ? "is-invalid" : ""}`}
+              className={`form-control ${
+                errors.confirmPassword ? "is-invalid" : ""
+              }`}
             />
             {errors.confirmPassword && (
               <p className="error">{errors.confirmPassword}</p>
@@ -167,15 +169,8 @@ export default function Register() {
           </div>
 
           {/* Submit button */}
-          <button type="submit" size="lg" className="btn btn-primary" disabled={loading}>
-            {loading ? (
-              <div className="d-flex align-items-center">
-                <Spinner animation="border" size="sm" />
-                <span className="ms-2">Registering...</span>
-              </div>
-            ) : (
-              "Sign Up"
-            )}
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            Sign Up
           </button>
 
           {/* Already have an account */}
@@ -183,12 +178,22 @@ export default function Register() {
             <p className="fw-bold">
               Already have an account?{" "}
               <a className="a" href="/login">
-                Login
+                Sign In
               </a>
             </p>
           </div>
         </form>
       </div>
+
+      {/* Overlay for loading spinner */}
+      {loading && (
+        <div className="overlay">
+          <div className="spinner-container">
+          <span className="ms-2">Wait A Few Minutes...</span>
+            <Spinner animation="border" variant="light" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

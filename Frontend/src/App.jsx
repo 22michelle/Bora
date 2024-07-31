@@ -1,6 +1,6 @@
 import "./App.css";
-import { Routes, Route } from "react-router-dom";
-import Navbar from "../src/components/Navbar";
+import { Routes, Route, BrowserRouter } from "react-router-dom";
+import Header from "./components/Header";
 import Home from "../src/pages/Home";
 import Login from "../src/pages/Login";
 import Register from "../src/pages/Register";
@@ -28,7 +28,8 @@ function App() {
 
   return (
     <>
-      <Navbar />
+      {/* Header */}
+      <Header />
       <Toaster position="botton-right" toastOptions={{ duration: 4000 }} />
       <Routes>
         <Route path="/" element={<Home />} />

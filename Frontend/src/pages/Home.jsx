@@ -11,11 +11,12 @@ export default function Home() {
           <p className="lead text-light mb-4">
             Bora is not just another wallet. It's powered by the Resilience
             Network Protocol, connecting users globally in a secure and
-            transparent way. <br />
-            <hr /> <span>"May your connections be stronger"</span>
+            transparent way.
           </p>
+          <hr />
+          <span>"May your connections be stronger"</span>
           <Link to="/register">
-            <button size="lg" className="btn explore">
+            <button size="lg" className="btn explore mt-4">
               Explore Bora
             </button>
           </Link>

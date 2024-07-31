@@ -37,8 +37,12 @@ userCtrl.register = async (req, res) => {
     const newUser = new UserModel({ name, email, password });
     await newUser.save();
     const token = newUser.generateAuthToken(); // Generate token with userId
+    res.cookie("access_token", token, {
+      httpOnly: true,
+      expires: new Date(Date.now() + 3600000), // 1 hour
+    });
     response(
-      res,
+      res, 
       201,
       true,
       { ...newUser.toJSON(), token },
