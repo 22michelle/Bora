@@ -1,0 +1,10 @@
+[build]
+command = "npm run build"
+publish = "/build"
+base = "/"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://backend-bora.onrender.com"
+  status = 200
+  force = true

@@ -13,15 +13,29 @@ connectDB();
 
 const app = express();
 app.set("Port", 4000);
-
 app.use(cookieParser());
 app.use(morgan("dev"));
+
+// Define allowed origins
+const allowedOrigins = [
+  "http://localhost:5173", // Local development
+  "https://frontend-bora.vercel.app", // Production
+];
+
+// Configure CORS
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+      if (allowedOrigins.includes(origin) || !origin) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 

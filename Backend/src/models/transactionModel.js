@@ -15,6 +15,8 @@ const TransactionSchema = new Schema(
       ref: "User",
       required: true,
     },
+    senderName: { type: String },
+    receiverName: { type: String },
     link: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Link",

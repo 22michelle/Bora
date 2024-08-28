@@ -1,3 +1,9 @@
+// authActions.js
 export const logout = () => (dispatch) => {
+  // Despachar la acción de logout
   dispatch({ type: "LOGOUT" });
+
+  // Limpiar localStorage
+  localStorage.removeItem("userId");
+  localStorage.removeItem("transactionId");
 };

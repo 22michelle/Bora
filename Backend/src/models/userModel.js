@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import mongoosePaginate from "mongoose-paginate-v2";
 
 const { Schema, model } = mongoose;
@@ -36,14 +35,14 @@ const UserSchema = new Schema(
     balance: {
       type: Number,
       required: true,
-      default: 1000,
+      default: 0,
     },
     link_obligation: {
       type: Number,
       required: true,
       default: 0,
     },
-    link_income: {
+    link_income: { 
       type: Number,
       required: true,
       default: 0,
@@ -51,12 +50,12 @@ const UserSchema = new Schema(
     value: {
       type: Number,
       required: true,
-      default: 1000,
+      default: 0,
     },
-    public_rate: {
+    public_rate: {  
       type: Number,
       required: true,
-      default: 0,
+      default: 10,
     },
     auxiliary: {
       type: Number,
@@ -85,6 +84,12 @@ const UserSchema = new Schema(
         ref: "Transaction",
       },
     ],
+    transactions: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Transaction",
+      },
+    ],
   },
   {
     timestamps: true,
@@ -109,13 +114,6 @@ UserSchema.pre("save", async function (next) {
 // Method to compare passwords
 UserSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
-};
-
-// Method to generate JWT
-UserSchema.methods.generateAuthToken = function () {
-  return jwt.sign({ id: this._id }, process.env.KEYWORD_TOKEN, {
-    expiresIn: "300d",
-  });
 };
 
 // Add pagination plugin

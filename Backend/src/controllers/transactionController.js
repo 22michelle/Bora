@@ -20,8 +20,8 @@ const initializeUsers = async () => {
       {},
       {
         $set: {
-          balance: 1000,
-          value: 1000,
+          balance: 0,
+          value: 0,
           public_rate: 10,
           link_obligation: 0,
           link_income: 0,
@@ -38,8 +38,8 @@ const initializeUsers = async () => {
       { _id: "66a8ff7bc992db5aa2ddf33f" },
       {
         $set: {
-          balance: 1000,
-          value: 1000,
+          balance: 0,
+          value: 0,
           public_rate: 10,
           link_obligation: 0,
           link_income: 0,
@@ -50,7 +50,6 @@ const initializeUsers = async () => {
         },
       }
     );
-
     console.log("Users initialized successfully.");
   } catch (error) {
     console.error(`Error initializing users: ${error.message}`);
@@ -59,6 +58,98 @@ const initializeUsers = async () => {
 
 // Call initializeUsers to set initial values
 // initializeUsers();
+
+// Deposit Money
+transactionCtrl.depositMoney = async (req, res) => { 
+  try {
+    const { accountNumber, amount } = req.body;
+
+    // Validate required fields
+    if (!accountNumber || !amount) {
+      return response(
+        res,
+        400,
+        false,
+        "",
+        "Account number and amount are required"
+      );
+    }
+
+    // Ensure amount is a number
+    const depositAmount = parseFloat(amount);
+    if (isNaN(depositAmount)) {
+      return response(res, 400, false, "", "Invalid deposit amount");
+    }
+
+    // Find the user by account number
+    const user = await UserModel.findOne({ accountNumber });
+
+    if (!user) {
+      return response(res, 404, false, "", "User not found");
+    }
+
+    // Update user's balance and value
+    user.balance = (user.balance || 0) + depositAmount;
+    user.value = await transactionCtrl.calculateValue(user); // Set value to match the new balance
+
+    // Save the updated user
+    await user.save(); 
+
+    // Return success response
+    return response(res, 200, true, user, "Deposit successful");
+  } catch (error) {
+    console.error(`Error depositing money: ${error.message}`);
+    return response(res, 500, false, null, error.message);
+  }
+};
+
+// Withdraw Money
+transactionCtrl.withdrawMoney = async (req, res) => {
+  try {
+    const { accountNumber, amount } = req.body;
+
+    // Validate required fields
+    if (!accountNumber || !amount) {
+      return response(
+        res,
+        400,
+        false,
+        "",
+        "Account number and amount are required"
+      );
+    }
+
+    // Check if amount is a positive number
+    if (amount <= 0) {
+      return response(res, 400, false, "", "Amount must be greater than zero");
+    }
+
+    // Find the user by account number
+    const user = await UserModel.findOne({ accountNumber });
+
+    if (!user) {
+      return response(res, 404, false, "", "User not found");
+    }
+
+    // Check if user has sufficient balance
+    if (user.balance < amount) {
+      return response(res, 400, false, "", "Insufficient balance");
+    }
+
+    // Update user's balance and value
+    user.balance -= amount;
+    user.value = await transactionCtrl.calculateValue(user); // Set value to match the new balance
+
+    // Save the updated user
+    await user.save();
+
+    // Return success response
+    return response(res, 200, true, user, "Withdrawal successful");
+  } catch (error) {
+    console.error(`Error withdrawing money: ${error.message}`);
+    return response(res, 500, false, null, error.message);
+  }
+};
 
 // Create Transaction
 transactionCtrl.createTransaction = async (req, res) => {
@@ -248,7 +339,7 @@ transactionCtrl.Distribute = async (user) => {
     const distributionAmount = user.auxiliary;
 
     // Identify all links where the user is the receiver
-    const links = await LinkModel.find({ receiverId: user._id });
+    const links = await LinkModel.find({ receiverId: user._id }); 
 
     let totalPR = 0;
     const participants = [];
@@ -318,7 +409,7 @@ transactionCtrl.clearteDistributionTransaction = async (
       if (link) {
         let linkValue = link.amount;
 
-        if (share > linkValue) {
+        if (share >= linkValue) {
           // Adjust share if it exceeds the link value
           share = linkValue;
           participant.auxiliary += share;
@@ -339,14 +430,15 @@ transactionCtrl.clearteDistributionTransaction = async (
           // Delete the link if it is fully utilized
           await LinkModel.deleteOne({ _id: link._id });
 
-          // If the distributor is not the admin, decrement the trigger
-          if (!distributor._id.equals("66a69d8fc52643ad71a3785a")) {
-            // Admin ID
+          // Decrement the trigger for distributors except the specific admin ID
+          if (!distributor._id.equals("66a8ff7bc992db5aa2ddf33f")) {
             distributor.trigger -= 1;
             await distributor.save();
             console.log(
               `Updated ${distributor.name}: Trigger = ${distributor.trigger}`
-            );
+            );  
+          } else {
+            console.log(`Admin ${distributor.name} trigger not decremented.`);
           }
 
           // Recalculate the public rate for the participant
@@ -371,7 +463,7 @@ transactionCtrl.clearteDistributionTransaction = async (
           // Update the link with reduced amount and rate set to 0
           await LinkModel.updateOne(
             { _id: link._id },
-            { $inc: { amount: -share }, $set: { feeRate: 0 } }
+            { $inc: { amount: -share } }
           );
 
           console.log(
@@ -390,7 +482,7 @@ transactionCtrl.clearteDistributionTransaction = async (
     console.error("Error creating distribution transaction:", error.message);
   }
 };
-3;
+
 // Calculate value for a user
 transactionCtrl.calculateValue = async (user) => {
   const linkObligation = await LinkModel.aggregate([
@@ -412,13 +504,35 @@ transactionCtrl.calculateValue = async (user) => {
 // Get all transactions
 transactionCtrl.getAllTransactions = async (req, res) => {
   try {
-    const transactions = await TransactionModel.find().populate(
-      "senderId receiverId"
-    );
+    const transactions = await TransactionModel.find()
+      .populate("senderId", "name")
+      .populate("receiverId", "name");
+
     return response(res, 200, true, transactions, "List of all transactions");
   } catch (error) {
     console.error(`Error retrieving transactions: ${error.message}`);
     return response(res, 500, false, "", "Error retrieving transactions");
+  }
+};
+
+// Get Transaction by ID
+transactionCtrl.getTransactionById = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(transactionId)) {
+      return response(res, 400, false, "", "Invalid transaction ID format");
+    }
+    const transaction = await TransactionModel.findById(transactionId).populate(
+      "senderId receiverId"
+    );
+
+    if (!transaction) {
+      return response(res, 404, false, "", "Transaction not found");
+    }
+
+    return response(res, 200, true, transaction, "Transaction found");
+  } catch (error) {
+    return response(res, 500, false, null, error.message);
   }
 };
 
